@@ -111,6 +111,7 @@ BITCOIN_CORE_H = \
   netbase.h \
   noui.h \
   policy/fees.h \
+  poolman.h \
   pow.h \
   primitives/block.h \
   primitives/transaction.h \
@@ -246,6 +247,7 @@ libbitcoin_common_a_SOURCES = \
   key.cpp \
   keystore.cpp \
   netbase.cpp \
+  poolman.cpp \
   primitives/block.cpp \
   primitives/transaction.cpp \
   protocol.cpp \

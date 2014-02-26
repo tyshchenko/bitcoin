@@ -18,6 +18,7 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "poolman.h"
 #include "rpcserver.h"
 #include "script/standard.h"
 #include "scheduler.h"
@@ -319,6 +320,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-proxyrandomize", strprintf(_("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"), 1));
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
+    strUsage += HelpMessageOpt("-janitorinterval=<n>" + _("Number of seconds between each mempool janitor run (default: 1 day)") + "\n";
+                               strUsage += HelpMessageOpt("-janitorexpire=<n>" + _("Number of seconds transactions live in memory pool, before removal (default: 3 days)");
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage += HelpMessageOpt("-upnp", _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"));
@@ -921,6 +924,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
+<<<<<<< HEAD
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
@@ -936,6 +940,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         RPCServer::OnStopped(&OnRPCStopped);
         RPCServer::OnPreCommand(&OnRPCPreCommand);
         StartRPCThreads();
+
+        // mempool janitor execution interval.  default interval: 1 day
+        int janitorInterval = GetArg("-janitorinterval", (60 * 60 * 24 * 1));
+
+        // mempool janitor TX expiration threshold.  default: 3 days
+        janitorExpire = GetArg("-janitorexpire", (60 * 60 * 24 * 3));
+        if (janitorExpire < 0) {
+            janitorExpire = 0;
+            janitorInterval = 0;
+        }
     }
 
     int64_t nStart;
@@ -1436,6 +1450,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pwalletMain)
         GenerateBitcoins(GetBoolArg("-gen", false), pwalletMain, GetArg("-genproclimit", 1));
 #endif
+
+    // start mempool janitor, if interval above sane safety margin
+    if (janitorInterval > 60)
+        threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "poolman", &TxMempoolJanitor, janitorInterval * 1000));
 
     // ********************************************************* Step 11: finished
 
