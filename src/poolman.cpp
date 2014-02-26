@@ -1,9 +1,10 @@
 
 #include "poolman.h"
-#include "core.h"
 #include "main.h"
-#include "wallet.h"
+#include "wallet/wallet.h"
 #include "init.h"
+#include "util.h"
+#include "utiltime.h"
 
 using namespace std;
 

@@ -320,8 +320,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-proxyrandomize", strprintf(_("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"), 1));
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
-    strUsage += HelpMessageOpt("-janitorinterval=<n>" + _("Number of seconds between each mempool janitor run (default: 1 day)") + "\n";
-                               strUsage += HelpMessageOpt("-janitorexpire=<n>" + _("Number of seconds transactions live in memory pool, before removal (default: 3 days)");
+    strUsage += HelpMessageOpt("-janitorinterval=<n>", _("Number of seconds between each mempool janitor run (default: 1 day)"));
+    strUsage += HelpMessageOpt("-janitorexpire=<n>", _("Number of seconds transactions live in memory pool, before removal (default: 3 days)"));
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage += HelpMessageOpt("-upnp", _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"));
@@ -924,7 +924,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
-<<<<<<< HEAD
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));

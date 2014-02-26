@@ -6,6 +6,7 @@
 #include "checkpoints.h"
 #include "consensus/validation.h"
 #include "main.h"
+#include "poolman.h"
 #include "primitives/transaction.h"
 #include "rpcserver.h"
 #include "sync.h"
@@ -716,5 +717,23 @@ UniValue reconsiderblock(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
 
+    return NullUniValue;
+}
+
+UniValue sweepmempool(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                            "sweepmempool\n"
+                            "\nRemoves old, unconfirmed transactions from mempool\n"
+                            "\nResult:\n"
+                            "n    (bool) true\n"
+                            "\nExamples:\n"
+                            + HelpExampleCli("sweepmempool", "")
+                            + HelpExampleRpc("sweepmempool", "")
+                            );
+    
+    TxMempoolJanitor();
+    
     return NullUniValue;
 }
