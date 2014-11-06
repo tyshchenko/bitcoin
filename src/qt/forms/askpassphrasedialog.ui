@@ -43,6 +43,12 @@
      </property>
      <item row="0" column="0">
       <widget class="QLabel" name="passLabel1">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="text">
         <string>Enter passphrase</string>
        </property>
@@ -50,6 +56,12 @@
      </item>
      <item row="0" column="1">
       <widget class="QLineEdit" name="passEdit1">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="echoMode">
         <enum>QLineEdit::Password</enum>
        </property>
@@ -57,6 +69,12 @@
      </item>
      <item row="1" column="0">
       <widget class="QLabel" name="passLabel2">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="text">
         <string>New passphrase</string>
        </property>
@@ -64,6 +82,12 @@
      </item>
      <item row="1" column="1">
       <widget class="QLineEdit" name="passEdit2">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="echoMode">
         <enum>QLineEdit::Password</enum>
        </property>
@@ -71,6 +95,12 @@
      </item>
      <item row="2" column="0">
       <widget class="QLabel" name="passLabel3">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="text">
         <string>Repeat new passphrase</string>
        </property>
@@ -78,6 +108,12 @@
      </item>
      <item row="2" column="1">
       <widget class="QLineEdit" name="passEdit3">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>20</height>
+        </size>
+       </property>
        <property name="echoMode">
         <enum>QLineEdit::Password</enum>
        </property>
