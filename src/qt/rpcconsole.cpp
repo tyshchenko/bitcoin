@@ -200,7 +200,7 @@ void RPCExecutor::request(const QString &command)
 }
 
 RPCConsole::RPCConsole(QWidget *parent) :
-    QDialog(parent),
+    QWidget(parent, Qt::Window),
     ui(new Ui::RPCConsole),
     clientModel(0),
     historyPtr(0),
@@ -278,7 +278,7 @@ bool RPCConsole::eventFilter(QObject* obj, QEvent *event)
             }
         }
     }
-    return QDialog::eventFilter(obj, event);
+    return QWidget::eventFilter(obj, event);
 }
 
 void RPCConsole::setClientModel(ClientModel *model)
@@ -368,9 +368,9 @@ void RPCConsole::clear()
 
 void RPCConsole::reject()
 {
-    // Ignore escape keypress if this is not a seperate window
-    if(windowType() != Qt::Widget)
-        QDialog::reject();
+//    // Ignore escape keypress if this is not a seperate window
+//    if(windowType() != Qt::Widget)
+//        QDialog::reject();
 }
 
 void RPCConsole::message(int category, const QString &message, bool html)

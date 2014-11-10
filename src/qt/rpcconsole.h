@@ -10,7 +10,7 @@
 
 #include "net.h"
 
-#include <QDialog>
+#include <QWidget>
 
 class ClientModel;
 
@@ -23,7 +23,7 @@ class QItemSelection;
 QT_END_NAMESPACE
 
 /** Local Bitcoin RPC console. */
-class RPCConsole: public QDialog
+class RPCConsole: public QWidget
 {
     Q_OBJECT
 
