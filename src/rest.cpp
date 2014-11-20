@@ -17,6 +17,7 @@ using namespace std;
 using namespace json_spirit;
 
 enum RetFormat {
+    RF_UNDEF,
     RF_BINARY,
     RF_HEX,
     RF_JSON,
@@ -26,7 +27,8 @@ static const struct {
     enum RetFormat rf;
     const char *name;
 } rf_names[] = {
-    { RF_BINARY, "binary" },            // default, if match not found
+    { RF_UNDEF, "" },
+    { RF_BINARY, "bin" },
     { RF_HEX, "hex" },
     { RF_JSON, "json" },
 };
@@ -48,11 +50,17 @@ static RestErr RESTERR(enum HTTPStatusCode status, string message)
     return re;
 }
 
-static enum RetFormat ParseDataFormat(const string& format)
+static enum RetFormat ParseDataFormat(vector<string> &params, const string strReq)
 {
-    for (unsigned int i = 0; i < ARRAYLEN(rf_names); i++)
-        if (format == rf_names[i].name)
-            return rf_names[i].rf;
+    boost::split(params, strReq, boost::is_any_of("."));
+
+    if(params.size() > 1) {
+        boost::algorithm::to_lower(params[1]);
+    
+        for (unsigned int i = 0; i < ARRAYLEN(rf_names); i++)
+            if (params[1] == rf_names[i].name)
+                return rf_names[i].rf;
+    }
 
     return rf_names[0].rf;
 }
@@ -66,16 +74,30 @@ static bool ParseHashStr(const string& strReq, uint256& v)
     return true;
 }
 
+static string AvailableDataFormatsString()
+{
+    string formats = "";
+    for (unsigned int i = 0; i < ARRAYLEN(rf_names); i++)
+        if (strlen(rf_names[i].name) > 0) {
+            formats.append(".");
+            formats.append(rf_names[i].name);
+            formats.append(",");
+        }
+    
+    if(formats.length()>0)
+        return formats.substr(0,formats.length()-1);
+    
+    return formats;
+}
+
 static bool rest_block(AcceptedConnection *conn,
                        string& strReq,
                        map<string, string>& mapHeaders,
                        bool fRun)
 {
     vector<string> params;
-    boost::split(params, strReq, boost::is_any_of("/"));
-
-    enum RetFormat rf = ParseDataFormat(params.size() > 1 ? params[1] : string(""));
-
+    enum RetFormat rf = ParseDataFormat(params, strReq);
+    
     string hashStr = params[0];
     uint256 hash;
     if (!ParseHashStr(hashStr, hash))
@@ -99,7 +121,7 @@ static bool rest_block(AcceptedConnection *conn,
     switch (rf) {
     case RF_BINARY: {
         string binaryBlock = ssBlock.str();
-        conn->stream() << HTTPReply(HTTP_OK, binaryBlock, fRun, false, "application/octet-stream") << std::flush;
+        conn->stream() << HTTPReplyHeader(HTTP_OK, fRun, binaryBlock.size(), "application/octet-stream") << binaryBlock << std::flush;
         return true;
     }
 
@@ -114,6 +136,10 @@ static bool rest_block(AcceptedConnection *conn,
         string strJSON = write_string(Value(objBlock), false) + "\n";
         conn->stream() << HTTPReply(HTTP_OK, strJSON, fRun) << std::flush;
         return true;
+    }
+        
+    default: {
+        throw RESTERR(HTTP_NOT_FOUND, "output format not found (available: "+AvailableDataFormatsString()+")");
      }
     }
 
@@ -127,9 +153,7 @@ static bool rest_tx(AcceptedConnection *conn,
                     bool fRun)
 {
     vector<string> params;
-    boost::split(params, strReq, boost::is_any_of("/"));
-
-    enum RetFormat rf = ParseDataFormat(params.size() > 1 ? params[1] : string(""));
+    enum RetFormat rf = ParseDataFormat(params, strReq);
 
     string hashStr = params[0];
     uint256 hash;
@@ -147,7 +171,7 @@ static bool rest_tx(AcceptedConnection *conn,
     switch (rf) {
     case RF_BINARY: {
         string binaryTx = ssTx.str();
-        conn->stream() << HTTPReply(HTTP_OK, binaryTx, fRun, false, "application/octet-stream") << std::flush;
+        conn->stream() << HTTPReplyHeader(HTTP_OK, fRun, binaryTx.length(), "application/octet-stream") << binaryTx << std::flush;
         return true;
     }
 
@@ -163,6 +187,9 @@ static bool rest_tx(AcceptedConnection *conn,
         string strJSON = write_string(Value(objTx), false) + "\n";
         conn->stream() << HTTPReply(HTTP_OK, strJSON, fRun) << std::flush;
         return true;
+    }
+    default: {
+        throw RESTERR(HTTP_NOT_FOUND, "output format not found (available: "+AvailableDataFormatsString()+")");
      }
     }
 
@@ -187,6 +214,9 @@ bool HTTPReq_REST(AcceptedConnection *conn,
                   bool fRun)
 {
     try {
+        if(RPCIsInWarmup())
+            throw RESTERR(HTTP_SERVICE_UNAVAILABLE, "Service currently not available (Loading block index...).");
+        
         for (unsigned int i = 0; i < ARRAYLEN(uri_prefixes); i++) {
             unsigned int plen = strlen(uri_prefixes[i].prefix);
             if (strURI.substr(0, plen) == uri_prefixes[i].prefix) {

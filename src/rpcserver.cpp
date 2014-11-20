@@ -762,6 +762,11 @@ void SetRPCWarmupFinished()
     fRPCInWarmup = false;
 }
 
+bool RPCIsInWarmup()
+{
+    return fRPCInWarmup;
+}
+
 void RPCRunHandler(const boost::system::error_code& err, boost::function<void(void)> func)
 {
     if (!err)
