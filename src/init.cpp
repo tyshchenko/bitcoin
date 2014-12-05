@@ -162,7 +162,10 @@ void Shutdown()
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
+    {
         bitdb.Flush(true);
+        bitdb.Close();
+    }
 #endif
 #ifndef WIN32
     boost::filesystem::remove(GetPidFile());
