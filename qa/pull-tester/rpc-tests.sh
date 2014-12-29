@@ -26,6 +26,7 @@ testScripts=(
     'mempool_spendcoinbase.py'
     'mempool_coinbase_spends.py'
     'httpbasics.py'
+    'rawtransactions.py'
 #    'forknotify.py'
 );
 if [ "x${ENABLE_BITCOIND}${ENABLE_UTILS}${ENABLE_WALLET}" = "x111" ]; then
