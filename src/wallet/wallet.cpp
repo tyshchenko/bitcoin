@@ -1116,6 +1116,7 @@ void CWallet::ReacceptWalletTransactions()
 
 void CWalletTx::RelayWalletTransaction()
 {
+    assert(pwallet->GetBroadcastTransactions());
     if (!IsCoinBase())
     {
         if (GetDepthInMainChain() == 0) {
@@ -1328,7 +1329,7 @@ void CWallet::ResendWalletTransactions()
 {
     // Do this infrequently and randomly to avoid giving away
     // that these are our transactions.
-    if (GetTime() < nNextResend)
+    if (GetTime() < nNextResend || !fBroadcastTransactions)
         return;
     bool fFirst = (nNextResend == 0);
     nNextResend = GetTime() + GetRand(30 * 60);
@@ -1968,14 +1969,17 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
         // Track how many getdata requests our transaction gets
         mapRequestCount[wtxNew.GetHash()] = 0;
 
-        // Broadcast
-        if (!wtxNew.AcceptToMemoryPool(false))
+        if (fBroadcastTransactions)
         {
-            // This must not fail. The transaction has already been signed and recorded.
-            LogPrintf("CommitTransaction(): Error: Transaction not valid");
-            return false;
+            // Broadcast
+            if (!wtxNew.AcceptToMemoryPool(false))
+            {
+                // This must not fail. The transaction has already been signed and recorded.
+                LogPrintf("CommitTransaction(): Error: Transaction not valid");
+                return false;
+            }
+            wtxNew.RelayWalletTransaction();
         }
-        wtxNew.RelayWalletTransaction();
     }
     return true;
 }
