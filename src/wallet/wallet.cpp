@@ -1096,6 +1096,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
 void CWallet::ReacceptWalletTransactions()
 {
+    // If transcations aren't broadcasted, don't let them into local mempool either
+    if (!fBroadcastTransactions)
+        return;
     LOCK2(cs_main, cs_wallet);
     BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
     {
