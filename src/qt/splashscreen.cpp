@@ -12,6 +12,7 @@
 #include "version.h"
 
 #ifdef ENABLE_WALLET
+#include "wallet/legacywallet.h"
 #include "wallet/wallet.h"
 #endif
 

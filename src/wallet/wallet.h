@@ -492,9 +492,6 @@ public:
     CWallet()
     {
         SetNull();
-        
-        strWalletFile = GetWalletFile();
-        fFileBacked = true;
     }
 
     CWallet(std::string strWalletFileIn)
@@ -705,16 +702,13 @@ public:
     void Flush(bool shutdown=false);
 
     //! Dump wallet infos to log
-    void LogInfos() const;
+    static void LogInfos();
     static void LogGeneralInfos();
     
     //! Verify the wallet database and perform salvage if required
-    static bool Verify(std::string& warningString, std::string& errorString);
-
-    static bool IsDisabled();
+    static bool Verify(const std::string& walletFile, std::string& warningString, std::string& errorString);
     
-    //! Map parameters to internal vars
-    static void MapParameters(std::string& warningString, std::string& errorString);
+    static void StartWalletTasks(boost::thread_group& threadGroup);
     
     //! Get user defined wallet file
     static std::string GetWalletFile();
@@ -723,7 +717,7 @@ public:
     static void SanityCheck(std::string& errorString);
     
     //! append help text to existing string
-    static void AppendHelpMessageString(std::string& strUsage);
+    static void AppendHelpMessageString(std::string& strUsage, bool debugHelp);
     
     /** 
      * Address book entry changed.

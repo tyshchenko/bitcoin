@@ -11,6 +11,10 @@
 #include "ui_interface.h"
 #include "util.h"
 
+#ifdef ENABLE_WALLET
+#include "wallet/legacywallet.h"
+#endif
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
@@ -65,6 +69,11 @@ bool AppInit(int argc, char* argv[])
     // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
     ParseParameters(argc, argv);
 
+    // Register Devices
+#ifdef ENABLE_WALLET
+    CLegacyWallet::RegisterSignals();
+#endif
+    
     // Process help and version before taking care about datadir
     if (mapArgs.count("-?") || mapArgs.count("-help") || mapArgs.count("-version"))
     {
@@ -162,6 +171,11 @@ bool AppInit(int argc, char* argv[])
     }
     Shutdown();
 
+    // Unregister Devices
+#ifdef ENABLE_WALLET
+    CLegacyWallet::UnregisterSignals();
+#endif
+    
     return fRet;
 }
 

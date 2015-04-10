@@ -13,6 +13,7 @@
 #include "util.h"
 #ifdef ENABLE_WALLET
 #include "wallet/db.h"
+#include "wallet/legacywallet.h"
 #include "wallet/wallet.h"
 #endif
 
@@ -52,7 +53,7 @@ TestingSetup::TestingSetup()
         InitBlockIndex();
 #ifdef ENABLE_WALLET
         std::string warningString, errorString;
-        pwalletMain = new CWallet();
+        pwalletMain = new CWallet(CLegacyWallet::GetWalletFile());
         pwalletMain->LoadWallet(warningString, errorString);
 #endif
         nScriptCheckThreads = 3;

@@ -25,7 +25,7 @@
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #ifdef ENABLE_WALLET
-#include "wallet/wallet.h"
+#include "wallet/legacywallet.h"
 #endif
 
 #include <stdint.h>
@@ -44,9 +44,6 @@
 
 using namespace std;
 
-#ifdef ENABLE_WALLET
-CWallet* pwalletMain = NULL;
-#endif
 bool fFeeEstimatesInitialized = false;
 
 #ifdef WIN32
@@ -148,9 +145,8 @@ void Shutdown()
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
     StopRPCThreads();
+    GetMainSignals().ShutdownRPCStopped();
 #ifdef ENABLE_WALLET
-    if (pwalletMain)
-        pwalletMain->Flush(false);
     GenerateBitcoins(false, NULL, 0);
 #endif
     StopNode();
@@ -181,18 +177,12 @@ void Shutdown()
         delete pblocktree;
         pblocktree = NULL;
     }
-#ifdef ENABLE_WALLET
-    if (pwalletMain)
-        pwalletMain->Flush(true);
-#endif
+    GetMainSignals().ShutdownNodeStopped();
 #ifndef WIN32
     boost::filesystem::remove(GetPidFile());
 #endif
     UnregisterAllValidationInterfaces();
-#ifdef ENABLE_WALLET
-    delete pwalletMain;
-    pwalletMain = NULL;
-#endif
+    GetMainSignals().ShutdownFinished();
     LogPrintf("%s: done\n", __func__);
 }
 
@@ -314,9 +304,8 @@ std::string HelpMessage(HelpMessageMode mode)
         " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway"));
         
 
-#ifdef ENABLE_WALLET
-    CWallet::AppendHelpMessageString(strUsage);
-#endif
+    // Allow validation interfaces to add a string to the help/usage text
+    GetMainSignals().CreateHelpString(strUsage, false);
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
     if (GetBoolArg("-help-debug", false))
@@ -335,10 +324,10 @@ std::string HelpMessage(HelpMessageMode mode)
         debugCategories += ", qt";
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
         _("If <category> is not supplied, output all debugging information.") + _("<category> can be:") + " " + debugCategories + ".");
-#ifdef ENABLE_WALLET
-    strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), 0));
-    strUsage += HelpMessageOpt("-genproclimit=<n>", strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"), 1));
-#endif
+
+    // Allow validation interfaces to add a string to the debug help
+    GetMainSignals().CreateHelpString(strUsage, true);
+
     strUsage += HelpMessageOpt("-help-debug", _("Show all debugging options (usage: --help -help-debug)"));
     strUsage += HelpMessageOpt("-logips", strprintf(_("Include IP addresses in debug output (default: %u)"), 0));
     strUsage += HelpMessageOpt("-logtimestamps", strprintf(_("Prepend debug output with timestamp (default: %u)"), 1));
@@ -713,16 +702,13 @@ bool AppInit2(boost::thread_group& threadGroup)
             return InitError(strprintf(_("Invalid amount for -minrelaytxfee=<amount>: '%s'"), mapArgs["-minrelaytxfee"]));
     }
 
-#ifdef ENABLE_WALLET
     std::string warningString, errorString;
-    
-    CWallet::MapParameters(warningString, errorString);
+    GetMainSignals().ParameterInteraction(warningString, errorString);
     
     if (!warningString.empty())
         InitWarning(warningString);
     if (!errorString.empty())
         return InitError(errorString);
-#endif // ENABLE_WALLET
 
     fIsBareMultisigStd = GetArg("-permitbaremultisig", true) != 0;
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
@@ -734,12 +720,13 @@ bool AppInit2(boost::thread_group& threadGroup)
         return InitError(_("Initialization sanity check failed. Bitcoin Core is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
-#ifdef ENABLE_WALLET
+    
+    // Give registered devices the possibility of init
     errorString.clear();
-    CWallet::SanityCheck(errorString);
+    GetMainSignals().AppInitialization(errorString);
     if (!errorString.empty())
         return InitError(errorString);
-#endif
+
     // Make sure only a single Bitcoin process is using the data directory.
     boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
@@ -755,9 +742,9 @@ bool AppInit2(boost::thread_group& threadGroup)
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     LogPrintf("Bitcoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
     LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
-#ifdef ENABLE_WALLET
-    CWallet::LogGeneralInfos();
-#endif
+
+    GetMainSignals().AppInitializationLogHead();
+
     if (!fLogTimestamps)
         LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
     LogPrintf("Default data directory %s\n", GetDefaultDataDir().string());
@@ -787,23 +774,18 @@ bool AppInit2(boost::thread_group& threadGroup)
 
     int64_t nStart;
 
-    // ********************************************************* Step 5: verify wallet database integrity
-#ifdef ENABLE_WALLET
-    if (!CWallet::IsDisabled()) {
-        uiInterface.InitMessage(_("Verifying wallet..."));
-
-        std::string warningString, errorString;
-        
-        if (!CWallet::Verify(warningString, errorString))
-            return false;
-        
-        if (!warningString.empty())
-            InitWarning(warningString);
-        if (!errorString.empty())
-            return InitError(errorString);
-        
-    }
-#endif // ENABLE_WALLET
+    // ********************************************************* Step 5: verify integrity of connected devices
+    warningString.clear();
+    errorString.clear();
+    bool stopInit;
+    GetMainSignals().VerifyIntegrity(warningString, errorString, stopInit);
+    if (stopInit)
+        return false;
+    
+    if (!warningString.empty())
+    InitWarning(warningString);
+    if (!errorString.empty())
+    return InitError(errorString);
     // ********************************************************* Step 6: network initialization
 
     RegisterNodeSignals(GetNodeSignals());
@@ -1046,28 +1028,18 @@ bool AppInit2(boost::thread_group& threadGroup)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // ********************************************************* Step 8: load wallet
-#ifdef ENABLE_WALLET
-    if (CWallet::IsDisabled()) {
-        pwalletMain = NULL;
-        LogPrintf("Wallet disabled!\n");
-    } else {
-        uiInterface.InitMessage(_("Loading wallet..."));
-        pwalletMain = new CWallet();
-        
-        std::string warningString, errorString;
-        
-        if(!pwalletMain->LoadWallet(warningString, errorString))
-            return false;
-        
-        if (!warningString.empty())
-            InitWarning(warningString);
-        if (!errorString.empty())
-            return InitError(errorString);
-    }
-#else // ENABLE_WALLET
-    LogPrintf("No wallet compiled in!\n");
-#endif // !ENABLE_WALLET
+    // ********************************************************* Step 8: load wallets/modules
+    warningString.clear();
+    errorString.clear();
+    stopInit = false;
+    GetMainSignals().LoadModules(warningString, errorString, stopInit);
+    if (stopInit)
+        return false;
+    
+    if (!warningString.empty())
+    InitWarning(warningString);
+    if (!errorString.empty())
+    return InitError(errorString);
     // ********************************************************* Step 9: import blocks
 
     if (mapArgs.count("-blocknotify"))
@@ -1104,12 +1076,9 @@ bool AppInit2(boost::thread_group& threadGroup)
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());
     LogPrintf("nBestHeight = %d\n",                   chainActive.Height());
-#ifdef ENABLE_WALLET
-    if (pwalletMain)
-        pwalletMain->LogInfos();
-#endif
 
     StartNode(threadGroup);
+    GetMainSignals().NodeStarted();
 
 #ifdef ENABLE_WALLET
     // Generate coins in the background
@@ -1122,15 +1091,7 @@ bool AppInit2(boost::thread_group& threadGroup)
     SetRPCWarmupFinished();
     uiInterface.InitMessage(_("Done loading"));
 
-#ifdef ENABLE_WALLET
-    if (pwalletMain) {
-        // Add wallet transactions that aren't already in a block to mapTransactions
-        pwalletMain->ReacceptWalletTransactions();
-
-        // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
-    }
-#endif
+    GetMainSignals().FinishInitializing(threadGroup);
 
     return !fRequestShutdown;
 }
