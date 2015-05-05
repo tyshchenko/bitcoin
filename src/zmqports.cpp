@@ -155,6 +155,9 @@ void ZMQShutdown()
 
         zmq_ctx_destroy(zmqContext);
         zmqContext = 0;
+
+        uiInterface.NotifyBlockTip.disconnect(ZMQPublishBlock);
+        uiInterface.NotifyRelayTx.disconnect(ZMQPublishTransaction);
     }
 
     fZMQPub = false;
