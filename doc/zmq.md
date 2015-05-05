@@ -62,7 +62,7 @@ facility, but will not do so until also configured properly.
 Currently, the ZeroMQ facility only needs to have the ZeroMQ endpoint
 specified:
 
-    $ bitcoind -zmqpub=tcp://127.0.0.1/28332
+    $ bitcoind -zmqpub=tcp://127.0.0.1:28332
 
 This will cause bitcoind to establish a PUB listening socket at the
 specified host address and port number.  The endpoint specifier may
