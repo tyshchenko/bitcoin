@@ -28,6 +28,7 @@ bool fZMQPub = false;
 // ZMQ related file scope variables
 static void *zmqContext;
 static void *zmqPubSocket;
+static ZMQFormat zmqFormat;
 
 // Internal utility functions
 static void ZMQPublishBlock(const uint256 &hash);
@@ -39,7 +40,7 @@ static void zmqError(const char *str)
 }
 
 // Called at startup to conditionally set up ZMQ socket(s)
-void ZMQInitialize(const std::string &endp)
+void ZMQInitialize(const std::string &endp, ZMQFormat format)
 {
     zmqContext = zmq_init(1);
     if (!zmqContext) {
@@ -64,13 +65,13 @@ void ZMQInitialize(const std::string &endp)
     uiInterface.NotifyBlockTip.connect(ZMQPublishBlock);
     uiInterface.NotifyRelayTx.connect(ZMQPublishTransaction);
 
+    zmqFormat = format;
     fZMQPub = true;
     LogPrint("zmq", "PUB socket listening at %s\n", endp);
 }
 
 // Internal function to pack a zmq_msg_t and send it
-// Note: assumes topic is a valid null terminated C string
-static int zmqPublish(const void *data, size_t size, int flags)
+int CZMQPublisher::Publish(const void* data, size_t size, int flags)
 {
     zmq_msg_t msg;
 
@@ -102,13 +103,23 @@ static void ZMQPublishTransaction(const CTransaction &tx)
     if (!zmqPubSocket)
         return;
 
-    // Serialize transaction
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << tx;
+    if (zmqFormat==ZMQ_FORMAT_NETWORK)
+    {
+        // Serialize transaction
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        ss << tx;
 
-    int rc = zmqPublish("TXN", 3, ZMQ_SNDMORE);
-    if (rc==0)
-        zmqPublish(&ss[0], ss.size(), 0);
+        int rc = zmqPublish("TXN", 3, ZMQ_SNDMORE);
+        if (rc==0)
+            zmqPublish(&ss[0], ss.size(), 0);
+    }
+    else if (zmqFormat==ZMQ_FORMAT_HASH)
+    {
+        std::string hex = tx.GetHash().GetHex();
+        int rc = zmqPublish("TXN", 3, ZMQ_SNDMORE);
+        if (rc==0)
+            zmqPublish(&hex[0], hex.size(), 0);
+    }
 }
 
 // Called after the block chain tip changed
@@ -117,22 +128,40 @@ static void ZMQPublishBlock(const uint256 &hash)
     if (!zmqPubSocket)
         return;
 
-    CBlock blk;
+    if (format==HashFormat)
     {
-        LOCK(cs_main);
+        uint256 hash = block.GetHash();
 
-        CBlockIndex* pblockindex = mapBlockIndex[hash];
-        if(!ReadBlockFromDisk(blk, pblockindex))
-            return;
+        // Send multipart message
+        int rc = Publish("BLK", 3, ZMQ_SNDMORE);
+        if (rc==0)
+            Publish(hash.begin(), hash.size(), 0);
     }
+    else if (format==NetworkFormat)
+    {
+        CBlock blk;
+        {
+            LOCK(cs_main);
+            CBlockIndex* pblockindex = mapBlockIndex[hash];
+            if(!ReadBlockFromDisk(blk, pblockindex))
+                return;
+        }
 
-    // Serialize block
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << blk;
+        // Serialize block
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        ss << blk;
 
-    int rc = zmqPublish("BLK", 3, ZMQ_SNDMORE);
-    if (rc==0)
-        zmqPublish(&ss[0], ss.size(), 0);
+        int rc = zmqPublish("BLK", 3, ZMQ_SNDMORE);
+        if (rc==0)
+            zmqPublish(&ss[0], ss.size(), 0);
+    }
+    else if (zmqFormat==ZMQ_FORMAT_HASH)
+    {
+        std::string hex = hash.GetHex();
+        int rc = zmqPublish("BLK", 3, ZMQ_SNDMORE);
+        if (rc==0)
+            zmqPublish(hex.c_str(), hex.size(), 0);
+    }
 }
 
 // Called during shutdown sequence
