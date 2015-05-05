@@ -55,6 +55,8 @@ CWallet* pwalletMain = NULL;
 #endif
 bool fFeeEstimatesInitialized = false;
 
+static CZMQPublisher* pzmqPublisher;
+
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
 // accessing block files don't count towards the fd_set size limit
@@ -192,7 +194,13 @@ void Shutdown()
         pwalletMain->Flush(true);
 #endif
 
-    ZMQShutdown();
+    if(pzmqPublisher)
+    {
+        UnregisterValidationInterface(pzmqPublisher);
+        pzmqPublisher->Shutdown();
+        delete pzmqPublisher;
+        pzmqPublisher = NULL;
+    }
 
 #ifndef WIN32
     try {
@@ -356,8 +364,9 @@ std::string HelpMessage(HelpMessageMode mode)
                     
 #endif
 
-    strUsage += HelpMessageGroup(_("ZeroMQ options"));
-    strUsage += HelpMessageOpt("-zmqpub=<endpoint>",_("Publish blocks and transactions on ZMQ port 'endpoint'"));
+    strUsage += HelpMessageGroup(_("ZeroMQ publisher options"));
+    strUsage += HelpMessageOpt("-zmqpub=<endpoint>",_("Publish blocks and transactions on 'endpoint'"));
+    strUsage += HelpMessageOpt("-zmqformat=<hash|network>",_("Publish format is either hash (default) or network"));
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
     if (GetBoolArg("-help-debug", false))
@@ -1049,10 +1058,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (mapArgs.count("-zmqpub"))
     {
-        ZMQFormat format = ZMQ_FORMAT_NETWORK;
-        if (mapArgs["-zmqformat"]=="hash")
-            format = ZMQ_FORMAT_HASH;
-        ZMQInitialize(mapArgs["-zmqpub"], format);
+        std::string endpoint = mapArgs["-zmqpub"];
+
+        CZMQPublisher::Format format = CZMQPublisher::HashFormat;
+        if (mapArgs["-zmqformat"]=="network")
+            format = CZMQPublisher::NetworkFormat;
+
+        pzmqPublisher = new CZMQPublisher;
+        pzmqPublisher->Initialize(endpoint, format);
+        RegisterValidationInterface(pzmqPublisher);
     }
 
     // ********************************************************* Step 7: load block chain
