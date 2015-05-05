@@ -2764,8 +2764,6 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     if (fCheckForPruning)
         FlushStateToDisk(state, FLUSH_STATE_NONE); // we just allocated more disk space for block files
 
-    uiInterface.NotifyAcceptBlock(block);
-
     return true;
 }
 

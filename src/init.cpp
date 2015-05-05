@@ -1030,7 +1030,9 @@ bool AppInit2(boost::thread_group& threadGroup)
         AddOneShot(strDest);
 
     if (mapArgs.count("-zmqpub"))
-      ZMQInitialize(mapArgs["-zmqpub"]);
+    {
+        ZMQInitialize(mapArgs["zmqpub"]);
+    }
 
     // ********************************************************* Step 7: load block chain
 

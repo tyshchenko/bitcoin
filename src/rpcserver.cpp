@@ -282,9 +282,6 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "getpeerinfo",            &getpeerinfo,            true  },
     { "network",            "ping",                   &ping,                   true  },
 
-    /* ZMQ notification */
-    { "zmq",                "getzmqurl",              &getzmqurl,              true  },
-
     /* Block chain and UTXO */
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true  },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       true  },

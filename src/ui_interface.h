@@ -98,9 +98,6 @@ public:
     /** New block has been accepted */
     boost::signals2::signal<void (const uint256& hash)> NotifyBlockTip;
 
-    /** New block has been accepted */
-    boost::signals2::signal<void (const CBlock& block)> NotifyAcceptBlock;
-
     /** New transaction to relay */
     boost::signals2::signal<void (const CTransaction& tx)> NotifyRelayTx;
 };
