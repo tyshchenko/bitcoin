@@ -19,6 +19,7 @@
 
 #if ENABLE_ZMQ
 #include <zmq.h>
+#include <stdarg.h>
 
 // Internal utility functions
 static void zmqError(const char *str)
@@ -51,14 +52,14 @@ void CZMQPublisher::Initialize(const std::string &endpoint, CZMQPublisher::Forma
     pcontext = zmq_init(1);
     if (!pcontext)
     {
-        zmqError("Unable to initialize ZMQ context");
+        zmqError("Unable to initialize context");
         return;
     }
 
     psocket = zmq_socket(pcontext, ZMQ_PUB);
     if (!psocket)
     {
-        zmqError("Unable to open ZMQ pub socket");
+        zmqError("Unable to open pub socket");
         zmq_ctx_destroy(pcontext);
         pcontext = 0;
         return;
@@ -67,7 +68,7 @@ void CZMQPublisher::Initialize(const std::string &endpoint, CZMQPublisher::Forma
     int rc = zmq_bind(psocket, endpoint.c_str());
     if (rc != 0)
     {
-        zmqError("Unable to bind ZMQ socket");
+        zmqError("Unable to bind socket");
         zmq_close(psocket);
         zmq_ctx_destroy(pcontext);
         psocket = 0;
@@ -98,30 +99,44 @@ void CZMQPublisher::Shutdown()
 }
 
 
-// Internal function to pack a zmq_msg_t and send it
-int CZMQPublisher::Publish(const void* data, size_t size, int flags)
+// Internal function to send amultipart pack a zmq_msg_t and send it
+static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
 {
 #if ENABLE_ZMQ
-    zmq_msg_t msg;
+    va_list args;
+    va_start(args, size);
 
-    int rc = zmq_msg_init_size(&msg, size);
-    if (rc != 0)
+    while (1)
     {
-        zmqError("Unable to initialize ZMQ msg");
-        return -1;
+        zmq_msg_t msg;
+
+        int rc = zmq_msg_init_size(&msg, size);
+        if (rc != 0)
+        {
+            zmqError("Unable to initialize ZMQ msg");
+            return -1;
+        }
+
+        void *buf = zmq_msg_data(&msg);
+        memcpy(buf, data, size);
+
+        data = va_arg(args, const void*);
+
+        rc = zmq_msg_send(&msg, sock, data ? ZMQ_SNDMORE : 0);
+        if (rc == -1)
+        {
+            zmqError("Unable to send ZMQ msg");
+            zmq_msg_close(&msg);
+            return -1;
+        }
+
+        zmq_msg_close(&msg);
+
+        if (!data)
+            break;
+
+        size = va_arg(args, size_t);
     }
-
-    void *buf = zmq_msg_data(&msg);
-    memcpy(buf, data, size);
-
-    rc = zmq_msg_send(&msg, psocket, flags);
-    if (rc == -1)
-    {
-        zmqError("Unable to send ZMQ msg");
-        return -1;
-    }
-
-    zmq_msg_close(&msg);
 #endif
     return 0;
 }
@@ -132,46 +147,41 @@ void CZMQPublisher::SyncTransaction(const CTransaction &tx, const CBlock *pblock
     if (!psocket)
         return;
 
+    int rc = 0;
+
     if (format==HashFormat)
     {
         uint256 hash = tx.GetHash();
-        int rc = Publish("TXN", 3, ZMQ_SNDMORE);
-        if (rc==0)
-            Publish(hash.begin(), hash.size(), 0);
+        rc = zmq_send_multipart(psocket, "TXN", 3, hash.begin(), hash.size(), 0);
     }
     else if (format==NetworkFormat)
     {
         // Serialize transaction
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
-
-        // Send multipart message
-        int rc = Publish("TXN", 3, ZMQ_SNDMORE);
-        if (rc==0)
-            Publish(&ss[0], ss.size(), 0);
+        rc = zmq_send_multipart(psocket, "TXN", 3, &ss[0], ss.size(), 0);
     }
+
+    if (rc!=0)
+        zmqError("Unable to send multipart message");
 #endif
 }
 
 // Called after the block chain tip changed
-void CZMQPublisher::UpdatedBlockTip(const CBlock &block)
+void CZMQPublisher::UpdatedBlockTip(const uint256 &hash)
 {
 #if ENABLE_ZMQ
     if (!psocket)
         return;
 
+    int rc = 0;
+
     if (format==HashFormat)
     {
-        uint256 hash = block.GetHash();
-
-        // Send multipart message
-        int rc = Publish("BLK", 3, ZMQ_SNDMORE);
-        if (rc==0)
-            Publish(hash.begin(), hash.size(), 0);
+        zmq_send_multipart(psocket, "BLK", 3, hash.begin(), hash.size(), 0);
     }
     else if (format==NetworkFormat)
     {
-        /*
         CBlock block;
         {
             LOCK(cs_main);
@@ -179,17 +189,15 @@ void CZMQPublisher::UpdatedBlockTip(const CBlock &block)
             if(!ReadBlockFromDisk(block, pblockindex))
                 return;
         }
-        */
 
         // Serialize block
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << block;
-
-        // Send multipart message
-        int rc = Publish("BLK", 3, ZMQ_SNDMORE);
-        if (rc==0)
-            Publish(&ss[0], ss.size(), 0);
+        rc = zmq_send_multipart(psocket, "BLK", 3, &ss[0], ss.size(), 0);
     }
+
+    if (rc!=0)
+        zmqError("Unable to send multipart message");
 #endif
 }
 

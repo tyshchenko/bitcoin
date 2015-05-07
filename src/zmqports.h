@@ -26,11 +26,9 @@ public:
 
 protected: // CValidationInterface
     void SyncTransaction(const CTransaction &tx, const CBlock *pblock);
-    void UpdatedBlockTip(const CBlock &block);
+    void UpdatedBlockTip(const uint256 &newHashTip);
 
 private:
-    int Publish(const void* data, size_t size, int flags);
-
     void *pcontext;
     void *psocket;
     Format format;
