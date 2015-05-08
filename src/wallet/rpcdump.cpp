@@ -12,7 +12,7 @@
 #include "sync.h"
 #include "util.h"
 #include "utiltime.h"
-#include "wallet.h"
+#include "wallet/legacywallet.h"
 
 #include <fstream>
 #include <stdint.h>

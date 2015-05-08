@@ -19,6 +19,7 @@
 #include "util.h"
 #ifdef ENABLE_WALLET
 #include "wallet/db.h"
+#include "wallet/legacywallet.h"
 #include "wallet/wallet.h"
 #endif
 
@@ -27,7 +28,7 @@
 #include <boost/thread.hpp>
 
 CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
-CWallet* pwalletMain;
+extern CWallet* pwalletMain;
 
 extern bool fPrintToConsole;
 extern void noui_connect();
@@ -62,7 +63,7 @@ TestingSetup::TestingSetup(CBaseChainParams::Network network) : BasicTestingSetu
         InitBlockIndex();
 #ifdef ENABLE_WALLET
         std::string warningString, errorString;
-        pwalletMain = new CWallet();
+        pwalletMain = new CWallet(CLegacyWalletModule::GetWalletFile());
         pwalletMain->LoadWallet(warningString, errorString);
 #endif
         nScriptCheckThreads = 3;
