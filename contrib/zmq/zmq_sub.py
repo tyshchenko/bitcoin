@@ -27,9 +27,9 @@ def handleTX(tx):
 
 try:
     while True:
-        msg = zmqSubSocket.recv()
-        msg_topic = msg[:topic_len]
-        msg_data  = msg[topic_len:]
+        msg = zmqSubSocket.recv_multipart()
+        msg_topic = str(msg[0])
+        msg_data  = msg[1]
 
         if msg_topic == "TXN":
             handleTX(msg_data)
