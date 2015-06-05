@@ -30,6 +30,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "zmq/zmqnotificationinterface.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -53,6 +54,8 @@ using namespace std;
 CWallet* pwalletMain = NULL;
 #endif
 bool fFeeEstimatesInitialized = false;
+
+static CZMQNotificationInterface* pzmqNotificationInterface;
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -190,6 +193,15 @@ void Shutdown()
     if (pwalletMain)
         pwalletMain->Flush(true);
 #endif
+
+    if (pzmqNotificationInterface)
+    {
+        UnregisterValidationInterface(pzmqNotificationInterface);
+        pzmqNotificationInterface->Shutdown();
+        delete pzmqNotificationInterface;
+        pzmqNotificationInterface = NULL;
+    }
+
 #ifndef WIN32
     try {
         boost::filesystem::remove(GetPidFile());
@@ -326,7 +338,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-whitebind=<addr>", _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6"));
     strUsage += HelpMessageOpt("-whitelist=<netmask>", _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") +
         " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway"));
-        
+
 
 #ifdef ENABLE_WALLET
     strUsage += HelpMessageGroup(_("Wallet options:"));
@@ -349,8 +361,11 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-walletnotify=<cmd>", _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)"));
     strUsage += HelpMessageOpt("-zapwallettxes=<mode>", _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on startup") +
         " " + _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"));
-                    
+
 #endif
+
+    strUsage += HelpMessageGroup(_("ZeroMQ publisher options"));
+    strUsage += HelpMessageOpt("-zmq<type><format><object>=<address>",_("Enable notification through zmq socket <address> (type=pub, format=hash|raw, object=block|transaction)"));
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
     if (GetBoolArg("-help-debug", false))
@@ -1039,6 +1054,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     BOOST_FOREACH(const std::string& strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
+
+    pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
+
+    if (pzmqNotificationInterface)
+    {
+        pzmqNotificationInterface->Initialize();
+        RegisterValidationInterface(pzmqNotificationInterface);
+    }
 
     // ********************************************************* Step 7: load block chain
 

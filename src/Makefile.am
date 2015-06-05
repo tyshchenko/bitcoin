@@ -152,7 +152,11 @@ BITCOIN_CORE_H = \
   wallet/db.h \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
-  wallet/walletdb.h
+  wallet/walletdb.h \
+  zmq/zmqabstractnotifier.h \
+  zmq/zmqconfig.h\
+  zmq/zmqnotificationinterface.h \
+  zmq/zmqpublishnotifier.h
 
 obj/build.h: FORCE
 	@$(MKDIR_P) $(builddir)/obj
@@ -189,6 +193,9 @@ libbitcoin_server_a_SOURCES = \
   txdb.cpp \
   txmempool.cpp \
   validationinterface.cpp \
+  zmq/zmqabstractnotifier.cpp \
+  zmq/zmqnotificationinterface.cpp \
+  zmq/zmqpublishnotifier.cpp \
   $(BITCOIN_CORE_H)
 
 # wallet: shared between bitcoind and bitcoin-qt, but only linked
@@ -317,7 +324,10 @@ bitcoind_LDADD += libbitcoin_wallet.a
 endif
 
 bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-#
+
+if ENABLE_ZMQ
+bitcoind_LDADD += $(ZMQ_LIBS)
+endif
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp
