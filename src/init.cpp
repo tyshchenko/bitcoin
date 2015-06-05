@@ -30,7 +30,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
-#include "zmqports.h"
+#include "zmq/zmqnotificationinterface.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -55,7 +55,7 @@ CWallet* pwalletMain = NULL;
 #endif
 bool fFeeEstimatesInitialized = false;
 
-static CZMQPublisher* pzmqPublisher;
+static CZMQNotificationInterface* pzmqNotificationInterface;
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -194,12 +194,12 @@ void Shutdown()
         pwalletMain->Flush(true);
 #endif
 
-    if(pzmqPublisher)
+    if (pzmqNotificationInterface)
     {
-        UnregisterValidationInterface(pzmqPublisher);
-        pzmqPublisher->Shutdown();
-        delete pzmqPublisher;
-        pzmqPublisher = NULL;
+        UnregisterValidationInterface(pzmqNotificationInterface);
+        pzmqNotificationInterface->Shutdown();
+        delete pzmqNotificationInterface;
+        pzmqNotificationInterface = NULL;
     }
 
 #ifndef WIN32
@@ -338,7 +338,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-whitebind=<addr>", _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6"));
     strUsage += HelpMessageOpt("-whitelist=<netmask>", _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") +
         " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway"));
-        
+
 
 #ifdef ENABLE_WALLET
     strUsage += HelpMessageGroup(_("Wallet options:"));
@@ -361,12 +361,11 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-walletnotify=<cmd>", _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)"));
     strUsage += HelpMessageOpt("-zapwallettxes=<mode>", _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on startup") +
         " " + _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"));
-                    
+
 #endif
 
     strUsage += HelpMessageGroup(_("ZeroMQ publisher options"));
-    strUsage += HelpMessageOpt("-zmqpub=<endpoint>",_("Publish blocks and transactions on 'endpoint'"));
-    strUsage += HelpMessageOpt("-zmqformat=<hash|network>",_("Publish format is either hash (default) or network"));
+    strUsage += HelpMessageOpt("-zmq<type><format><object>=<address>",_("Enable notification through zmq socket <address> (type=pub, format=hash|raw, object=block|transaction)"));
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
     if (GetBoolArg("-help-debug", false))
@@ -945,15 +944,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         std::string warningString;
         std::string errorString;
-        
+
         if (!CWallet::Verify(strWalletFile, warningString, errorString))
             return false;
-        
+
         if (!warningString.empty())
             InitWarning(warningString);
         if (!errorString.empty())
             return InitError(warningString);
-        
+
     } // (!fDisableWallet)
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
@@ -1056,17 +1055,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
-    if (mapArgs.count("-zmqpub"))
+    pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
+
+    if (pzmqNotificationInterface)
     {
-        std::string endpoint = mapArgs["-zmqpub"];
-
-        CZMQPublisher::Format format = CZMQPublisher::HashFormat;
-        if (mapArgs["-zmqformat"]=="network")
-            format = CZMQPublisher::NetworkFormat;
-
-        pzmqPublisher = new CZMQPublisher;
-        pzmqPublisher->Initialize(endpoint, format);
-        RegisterValidationInterface(pzmqPublisher);
+        pzmqNotificationInterface->Initialize();
+        RegisterValidationInterface(pzmqNotificationInterface);
     }
 
     // ********************************************************* Step 7: load block chain

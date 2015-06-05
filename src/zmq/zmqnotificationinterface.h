@@ -8,20 +8,18 @@
 
 #include "validationinterface.h"
 #include <string>
+#include <map>
 
-class CZMQPublisher : public CValidationInterface
+class CZMQAbstractNotifier;
+
+class CZMQNotificationInterface : public CValidationInterface
 {
 public:
-    enum Format
-    {
-        HashFormat,
-        NetworkFormat
-    };
+    virtual ~CZMQNotificationInterface();
 
-    CZMQPublisher();
-    virtual ~CZMQPublisher();
+    static CZMQNotificationInterface* CreateWithArguments(const std::map<std::string, std::string> &args);
 
-    void Initialize(const std::string &endpoint, Format format);
+    bool Initialize();
     void Shutdown();
 
 protected: // CValidationInterface
@@ -29,9 +27,10 @@ protected: // CValidationInterface
     void UpdatedBlockTip(const uint256 &newHashTip);
 
 private:
+    CZMQNotificationInterface();
+
     void *pcontext;
-    void *psocket;
-    Format format;
+    std::list<CZMQAbstractNotifier*> notifiers;
 };
 
 #endif // BITCOIN_ZMQPORTS_H
