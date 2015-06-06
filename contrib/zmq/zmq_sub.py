@@ -4,8 +4,8 @@ import zmq
 import binascii
 
 port = 28332
-topic1 = "BLK"
-topic2 = "TXN"
+topic1 = "block"
+topic2 = "tx"
 topic_len = len(topic1)
 
 zmqContext = zmq.Context()
@@ -31,9 +31,9 @@ try:
         msg_topic = str(msg[0])
         msg_data  = msg[1]
 
-        if msg_topic == "TXN":
+        if msg_topic == "tx":
             handleTX(msg_data)
-        elif msg_topic == "BLK":
+        elif msg_topic == "block":
             handleBLK(msg_data)
 
 except KeyboardInterrupt:

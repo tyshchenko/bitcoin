@@ -7,12 +7,12 @@
 # Test ZMQ interface
 #
 
-from test_framework import BitcoinTestFramework
-from util import *
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import *
 import json
 import zmq
 import binascii
-from mininode import hash256
+from test_framework.mininode import hash256
 
 try:
     import http.client as httplib
@@ -37,14 +37,14 @@ class ZMQTest (BitcoinTestFramework):
     def setup_nodes(self):
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
-        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, "BLK")
-        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, "TXN")
+        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, "block")
+        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, "tx")
         self.zmqSubSocket.connect("tcp://127.0.0.1:%i" % self.port)
 
         # Note: proxies are not used to connect to local nodes
         # this is because the proxy to use is based on CService.GetNetwork(), which return NET_UNROUTABLE for localhost
         return start_nodes(4, self.options.tmpdir, extra_args=[
-            ['-zmqpub=tcp://127.0.0.1:'+str(self.port)],
+            ['-zmqpubhashblock=tcp://127.0.0.1:'+str(self.port), '-zmqpubhashtransaction=tcp://127.0.0.1:'+str(self.port)],
             [],
             [],
             []
@@ -54,7 +54,9 @@ class ZMQTest (BitcoinTestFramework):
 
         genhashes = self.nodes[0].generate(1);
 
+        print "goon"
         msg = self.zmqSubSocket.recv()
+        print "goon2"
         blkhash = self.handleBLK(msg[3:])
         assert_equal(genhashes[0], blkhash) #blockhash from generate must be equal to the hash received over zmq
 
@@ -77,8 +79,11 @@ class ZMQTest (BitcoinTestFramework):
         self.sync_all()
 
         #now we should receive a zmq msg because the tx was broadcastet
+        print "goon"
         msg = self.zmqSubSocket.recv()
+        print "ok"
         hashZMQ = self.handleTX(msg[3:])
+        print hashZMQ
         assert_equal(hashRPC, hashZMQ) #blockhash from generate must be equal to the hash received over zmq
 
 
