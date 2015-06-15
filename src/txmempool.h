@@ -102,6 +102,8 @@ public:
     std::map<COutPoint, CInPoint> mapNextTx;
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
 
+    int64_t nLastJanitorCheck;
+
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
 

@@ -5,5 +5,7 @@
 
 extern void TxMempoolJanitor();
 extern int64_t janitorExpire;
+extern int64_t janitorInterval;
+
 
 #endif // __BITCOIN_POOLMAN_H__

@@ -940,14 +940,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         RPCServer::OnPreCommand(&OnRPCPreCommand);
         StartRPCThreads();
 
-        // mempool janitor execution interval.  default interval: 1 day
-        int janitorInterval = GetArg("-janitorinterval", (60 * 60 * 24 * 1));
-
         // mempool janitor TX expiration threshold.  default: 3 days
         janitorExpire = GetArg("-janitorexpire", (60 * 60 * 24 * 3));
-        if (janitorExpire < 0) {
-            janitorExpire = 0;
-            janitorInterval = 0;
+        if (janitorExpire < 3600*3) { //force to use at least 3h as mempool exp. time
+            janitorExpire = 3600*3;
+        }
+
+        janitorInterval = GetArg("-janitorinterval", (60 * 60 * 24));
+        if (janitorInterval < 60) { //force to use at least 60 seconds between janitor runs
+            janitorInterval = 60;
         }
     }
 
@@ -1449,11 +1450,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pwalletMain)
         GenerateBitcoins(GetBoolArg("-gen", false), pwalletMain, GetArg("-genproclimit", 1));
 #endif
-
-    // start mempool janitor, if interval above sane safety margin
-    if (janitorInterval > 60)
-        threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "poolman", &TxMempoolJanitor, janitorInterval * 1000));
-
     // ********************************************************* Step 11: finished
 
     SetRPCWarmupFinished();

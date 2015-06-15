@@ -34,6 +34,8 @@ protected:
     virtual void Inventory(const uint256 &hash) {}
     virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void BlockChecked(const CBlock&, const CValidationState&) {}
+    virtual void RemoveTransactionsFromCleanupVector(std::vector<CTransaction>&, unsigned int &nProtected) {}
+
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
@@ -52,6 +54,8 @@ struct CMainSignals {
     boost::signals2::signal<void (int64_t nBestBlockTime)> Broadcast;
     /** Notifies listeners of a block validation result */
     boost::signals2::signal<void (const CBlock&, const CValidationState&)> BlockChecked;
+    /** Notifies listeners of a block validation result */
+    boost::signals2::signal<void (std::vector<CTransaction> &, unsigned int &)> PrepareMempoolCleanup;
 };
 
 CMainSignals& GetMainSignals();

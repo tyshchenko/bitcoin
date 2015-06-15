@@ -1330,6 +1330,26 @@ bool CWalletTx::IsTrusted() const
     return true;
 }
 
+void CWallet::RemoveTransactionsFromCleanupVector(std::vector<CTransaction> &vtx, unsigned int &nProtected)
+{
+    std::vector<CTransaction>::iterator it = vtx.begin();
+
+    while (it != vtx.end()) {
+        CTransaction tx = *it;
+        if (IsMine(tx) || IsFromMe(tx))
+        {
+            it = vtx.erase(it);
+            nProtected++;
+
+            //now we need to check if vins are in the memory pool
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
 std::vector<uint256> CWallet::ResendWalletTransactionsBefore(int64_t nTime)
 {
     std::vector<uint256> result;

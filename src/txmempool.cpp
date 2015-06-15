@@ -10,6 +10,7 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "policy/fees.h"
+#include "poolman.h"
 #include "streams.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -56,6 +57,8 @@ CTxMemPool::CTxMemPool(const CFeeRate& _minRelayFee) :
     fSanityCheck = false;
 
     minerPolicyEstimator = new CBlockPolicyEstimator(_minRelayFee);
+
+    nLastJanitorCheck = GetTime();
 }
 
 CTxMemPool::~CTxMemPool()
@@ -102,6 +105,14 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
     minerPolicyEstimator->processTransaction(entry, fCurrentEstimate);
+
+    // Check if it's time to get help from the mempool janitor
+    int64_t now = GetTime();
+    if (nLastJanitorCheck+janitorInterval < now)
+    {
+        TxMempoolJanitor();
+        nLastJanitorCheck = now;
+    }
 
     return true;
 }
