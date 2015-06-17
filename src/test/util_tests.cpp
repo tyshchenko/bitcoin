@@ -215,6 +215,33 @@ BOOST_AUTO_TEST_CASE(util_ParseMoney)
 
     // Attempted 63 bit overflow should fail
     BOOST_CHECK(!ParseMoney("92233720368.54775808", ret));
+
+    BOOST_CHECK(ParseMoneyJSON("1e-8", ret));
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+    BOOST_CHECK(ParseMoneyJSON("0.1e-7", ret));
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+    BOOST_CHECK(ParseMoneyJSON("0.01e-6", ret));
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+    BOOST_CHECK(ParseMoneyJSON("0.00000000000000000000000000000000000001e+30 ", ret));
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+    BOOST_CHECK(ParseMoneyJSON("0.0000000000000000000000000000000000000000000000000000000000000000000000000001e+68", ret));
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+    BOOST_CHECK(ParseMoneyJSON("10000000000000000000000000000000000000000000000000000000000000000e-64", ret));
+    BOOST_CHECK_EQUAL(ret, COIN);
+    BOOST_CHECK(ParseMoneyJSON("10000000000000000000000000000000000000000000000000000000000000000e-64", ret));
+    BOOST_CHECK_EQUAL(ret, COIN);
+    BOOST_CHECK(!ParseMoneyJSON("1e-9", ret)); //should fail
+    BOOST_CHECK(!ParseMoneyJSON("0.000000019", ret)); //should fail
+    BOOST_CHECK(ParseMoneyJSON("0.00000001000000", ret)); //should pass, cut trailing 0
+    BOOST_CHECK(!ParseMoneyJSON("19e-9", ret)); //should fail
+    BOOST_CHECK(!ParseMoneyJSON(".19e-6", ret)); //should fail, missing leading 0, therefore invalid JSON
+    BOOST_CHECK(ParseMoneyJSON("0.19e-6", ret)); //should pass, leading 0 is present
+    BOOST_CHECK_EQUAL(ret, COIN/100000000);
+
+    BOOST_CHECK(!ParseMoneyJSON("92'233'720'368.54775808", ret)); //overflow error
+    BOOST_CHECK(!ParseMoneyJSON("1e+11", ret)); //overflow error
+    BOOST_CHECK(!ParseMoneyJSON("1e11", ret)); //overflow error signless
+    BOOST_CHECK(!ParseMoneyJSON("93e+9", ret)); //overflow error
 }
 
 BOOST_AUTO_TEST_CASE(util_IsHex)
