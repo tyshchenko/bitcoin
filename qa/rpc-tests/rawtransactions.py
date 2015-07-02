@@ -140,5 +140,26 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[0].getbalance(), bal+Decimal('50.00000000')+Decimal('2.19000000')) #block reward + tx
 
+        #OP_RETURN test
+        changeaddress = self.nodes[0].getrawchangeaddress()
+        unspent = self.nodes[0].listunspent()[0]
+        hexdata = "6d6f6e65797374696e6b73"
+        rawtx = self.nodes[0].createrawtransaction([unspent], {"data": hexdata, changeaddress: ( unspent['amount']-Decimal('0.00010000')) }) #create a OP_RETURN TX with a change output to myself
+        signedRawtx = self.nodes[0].signrawtransaction(rawtx)
+        opRetTxId = self.nodes[0].sendrawtransaction(signedRawtx['hex']);
+        self.sync_all()
+        self.nodes[0].generate(1)
+        self.sync_all()
+        bbhash = self.nodes[1].getbestblockhash()
+        bb = self.nodes[1].getblock(bbhash, True)
+        rtx = self.nodes[1].getrawtransaction(opRetTxId)
+        rtxDec = self.nodes[1].decoderawtransaction(rtx)
+        txFound = False
+        for out in rtxDec['vout']:
+            print out['scriptPubKey']['hex']
+            if out['scriptPubKey']['hex'] == "6a"+"0b"+hexdata:
+                txFound = True
+        assert_equal(txFound, True)
+
 if __name__ == '__main__':
     RawTransactionsTest().main()
