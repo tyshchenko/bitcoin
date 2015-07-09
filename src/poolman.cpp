@@ -87,6 +87,8 @@ void InitTxMempoolJanitor(CScheduler& scheduler)
         janitorInterval = 0;
         PoolmanLowWater = -1;
         PoolmanHighWater = 0;
+        LogPrint("mempool", "mempool janitor was disabled because of a insane interval (min interval: %d)\n",
+                 janitorSaneInterval);
     }
 
     // start mempool janitor
