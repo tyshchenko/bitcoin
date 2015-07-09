@@ -91,6 +91,6 @@ void InitTxMempoolJanitor(CScheduler& scheduler)
 
     // start mempool janitor
     if (janitorInterval > 0)
-        scheduler.scheduleEvery(&TxMempoolJanitor, janitorInterval * 1000);
+        scheduler.scheduleEvery(&TxMempoolJanitor, janitorInterval);
 }
 
