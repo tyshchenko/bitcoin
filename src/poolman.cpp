@@ -81,7 +81,7 @@ void InitTxMempoolJanitor(CScheduler& scheduler)
     }
 
     // if interval too small or zero, janitor is disabled
-    static const int janitorSaneInterval = 10;
+    static const int janitorSaneInterval = 5;
     if ((janitorInterval < janitorSaneInterval) ||
         (PoolmanHighWater <= 0)) {
         janitorInterval = 0;
