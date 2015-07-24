@@ -322,7 +322,7 @@ bool OptionsDialog::eventFilter(QObject *object, QEvent *event)
         }
         else if(object == ui->proxyIpTor)
         {
-            emit proxyIpChecks(ui->proxyIpTor, ui->proxyPortTor->text().toInt());
+            Q_EMIT proxyIpChecks(ui->proxyIpTor, ui->proxyPortTor->text().toInt());
         }
     }
     return QDialog::eventFilter(object, event);
