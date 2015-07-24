@@ -10,19 +10,19 @@ The following is a list of assets used in the bitcoin source and their proper at
 * Site: [https://github.com/stephenhutchings/typicons.font](https://github.com/stephenhutchings/typicons.font)
 
 ### Assets Used
-	src/qt/res/icons/add.png, src/qt/res/icons/address-book.png,
-	src/qt/res/icons/configure.png, src/qt/res/icons/connect4.png,
-    src/qt/res/icons/debugwindow.png, src/qt/res/icons/edit.png,
-    src/qt/res/icons/exitcopy.png, src/qt/res/icons/editpaste.png,
-    src/qt/res/icons/export.png, src/qt/res/icons/eye.png,
-    src/qt/res/icons/filesave.png, src/qt/res/icons/history.png,
-    src/qt/res/icons/info.png, src/qt/res/icons/key.png,
-    src/qt/res/icons/lock_*.png, src/qt/res/icons/open.png,
-    src/qt/res/icons/overview.png, src/qt/res/icons/quit.png,
-    src/qt/res/icons/receive.png, src/qt/res/icons/remove.png,
-    src/qt/res/icons/send.png, src/qt/res/icons/synced.png,
-    src/qt/res/icons/transaction*.png, src/qt/res/icons/tx_output.png,
-    src/qt/res/icons/warning.png
+    src/qt/res/icons/add.png, src/qt/res/icons/address-book.png,
+    src/qt/res/icons/checkmark.png, src/qt/res/icons/configure.png,
+    src/qt/res/icons/connect4.png, src/qt/res/icons/debugwindow.png,
+    src/qt/res/icons/edit.png, src/qt/res/icons/exitcopy.png,
+    src/qt/res/icons/editpaste.png, src/qt/res/icons/export.png,
+    src/qt/res/icons/eye.png, src/qt/res/icons/filesave.png,
+    src/qt/res/icons/history.png, src/qt/res/icons/info.png,
+    src/qt/res/icons/key.png, src/qt/res/icons/lock_*.png,
+    src/qt/res/icons/open.png, src/qt/res/icons/overview.png,
+    src/qt/res/icons/quit.png, src/qt/res/icons/receive.png,
+    src/qt/res/icons/remove.png, src/qt/res/icons/send.png,
+    src/qt/res/icons/synced.png, src/qt/res/icons/transaction*.png,
+    src/qt/res/icons/tx_output.png, src/qt/res/icons/warning.png
 
 Jonas Schnelli
 -----------------------

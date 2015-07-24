@@ -20,7 +20,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tabMain">
       <attribute name="title">
@@ -299,6 +299,9 @@
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2_Network">
+         <property name="spacing">
+          <number>0</number>
+         </property>
          <item>
           <widget class="QLabel" name="proxyActiveNets">
            <property name="text">
@@ -310,15 +313,48 @@
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="proxyReachIPv4">
+          <spacer name="labelSpacer0">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="proxyReachIPv4">
            <property name="enabled">
             <bool>false</bool>
+           </property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
            </property>
            <property name="toolTip">
             <string>Shows, if the supplied default SOCKS5 proxy is used to reach peers via this network type.</string>
            </property>
-           <property name="text">
-            <string/>
+           <property name="icon">
+            <iconset>
+             <normaloff>:/icons/checkmark</normaloff>
+             <disabledoff>:/icons/checkmark</disabledoff>:/icons/checkmark</iconset>
+           </property>
+           <property name="flat">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -333,15 +369,48 @@
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="proxyReachIPv6">
+          <spacer name="labelSpacer1">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="proxyReachIPv6">
            <property name="enabled">
             <bool>false</bool>
+           </property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
            </property>
            <property name="toolTip">
             <string>Shows, if the supplied default SOCKS5 proxy is used to reach peers via this network type.</string>
            </property>
-           <property name="text">
-            <string/>
+           <property name="icon">
+            <iconset>
+             <normaloff>:/icons/checkmark</normaloff>
+             <disabledoff>:/icons/checkmark</disabledoff>:/icons/checkmark</iconset>
+           </property>
+           <property name="flat">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -356,15 +425,48 @@
           </widget>
          </item>
          <item>
-          <widget class="QCheckBox" name="proxyReachTor">
+          <spacer name="labelSpacer2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>10</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="proxyReachTor">
            <property name="enabled">
             <bool>false</bool>
+           </property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>18</width>
+             <height>18</height>
+            </size>
            </property>
            <property name="toolTip">
             <string>Shows, if the supplied default SOCKS5 proxy is used to reach peers via this network type.</string>
            </property>
-           <property name="text">
-            <string/>
+           <property name="icon">
+            <iconset>
+             <normaloff>:/icons/checkmark</normaloff>
+             <disabledoff>:/icons/checkmark</disabledoff>:/icons/checkmark</iconset>
+           </property>
+           <property name="flat">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
