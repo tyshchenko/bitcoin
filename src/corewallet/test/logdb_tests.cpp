@@ -8,8 +8,10 @@
 #include "random.h"
 #include "util.h"
 #include "test/test_bitcoin.h"
+#include "sync.h"
 
 #include <boost/test/unit_test.hpp>
+#include <boost/thread.hpp>
 
 using namespace std;
 static const string strSecret1     ("Kwr371tjA9u2rFSMZjTNun2PXXP3WPZu2afRHTcta6KxEUdm1vEw");
@@ -197,6 +199,124 @@ BOOST_AUTO_TEST_CASE(logdb_test_rewrite)
     fclose(fh);
     
     BOOST_CHECK(newFileSize > (oldFileSize-8)/2.0); // file size must be half the size minus the ~8 header (depends on version int length) bytes
+}
+
+char randchar()
+{
+    const char charset[] =
+    "0123456789"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz";
+    const size_t max_index = (sizeof(charset) - 1);
+    int randN = rand();
+    char rC = charset[ randN % max_index ];
+    return rC;
+}
+
+std::string random_string( int length )
+{
+    std::string str;
+    for (int i=0;i<length;i++)
+    {
+        str += randchar();
+    }
+    return str;
+}
+
+static std::map<std::string, std::string> kvMap;
+CCriticalSection cs;
+
+void workerFunc(CLogDB *aDB)
+{
+    unsigned int i;
+    for (i = 0; i < 100; i++)
+    {
+        std::string aKey   = std::string(random_string(100));
+        std::string aValue = std::string(random_string(100));
+        aDB->Write(aKey, aValue);
+        aDB->Flush(false);
+
+        {
+            LOCK(cs);
+            kvMap[aKey] = aValue;
+        }
+    }
+}
+
+void overwriteLoop(CLogDB *aDB)
+{
+    std::map<std::string, std::string> kvMapC;
+    {
+        LOCK(cs);
+        kvMapC = kvMap;
+    }
+
+    for (std::map<std::string, std::string>::iterator it = kvMapC.begin(); it != kvMapC.end(); ++it)
+    {
+        std::string aValue = std::string(random_string(100));
+        aDB->Write(it->first, aValue);
+        aDB->Flush(false);
+
+        {
+            LOCK(cs);
+            kvMap[it->first] = aValue;
+        }
+    }
+}
+
+
+
+BOOST_AUTO_TEST_CASE(logdb_test_thread)
+{
+    boost::filesystem::path tmpPath = GetTempPath() / strprintf("test_bitcoin_logdb_compact_%lu_%i.logdb", (unsigned long)GetTime(), (int)(GetRand(100000)));
+
+    std::string dbFile = tmpPath.string();
+    std::string dbFileRewritten = dbFile+".tmp";
+    CLogDB *aDB = new CLogDB(dbFile, false);
+    aDB->Load();
+
+
+    boost::thread workerThread0(workerFunc, aDB);
+    boost::thread workerThread1(workerFunc, aDB);
+    boost::thread workerThread2(workerFunc, aDB);
+    boost::thread workerThread3(workerFunc, aDB);
+
+    workerFunc(aDB);
+    workerThread0.join();
+    workerThread1.join();
+    workerThread2.join();
+    workerThread3.join();
+    aDB->Flush(true); //shutdown, close the file
+    BOOST_CHECK_EQUAL(kvMap.size(), 500);
+
+    aDB->Close();
+    delete aDB;
+    aDB = new CLogDB(dbFile, false);
+    aDB->Load();
+    std::string returnString;
+
+    for (std::map<std::string, std::string>::iterator it = kvMap.begin(); it != kvMap.end(); ++it)
+    {
+        std::string aKey = it->first;
+        aDB->Read(aKey, returnString);
+        BOOST_CHECK_EQUAL(returnString, it->second);
+    }
+
+    overwriteLoop(aDB);
+    aDB->Flush(true);
+    BOOST_CHECK_EQUAL(kvMap.size(), 500);
+
+    aDB->Close();
+    delete aDB;
+    aDB = new CLogDB(dbFile, false);
+    aDB->Load();
+
+    for (std::map<std::string, std::string>::iterator it = kvMap.begin(); it != kvMap.end(); ++it)
+    {
+        std::string aKey = it->first;
+        aDB->Read(aKey, returnString);
+        BOOST_CHECK_EQUAL(returnString, it->second);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
