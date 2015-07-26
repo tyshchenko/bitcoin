@@ -88,7 +88,7 @@ bool Wallet::SetAndStoreAddressBook(const CTxDestination& address, const std::st
 
 const unsigned int HD_MAX_DEPTH = 20;
 
-bool Wallet::HDSetChainPath(const std::string& chainPathIn, bool generateMaster, CKeyingMaterial& vSeed, HDChainID& chainId, bool overwrite)
+bool Wallet::HDAddHDChain(const std::string& chainPathIn, bool generateMaster, CKeyingMaterial& vSeed, HDChainID& chainId, std::string &strBase58ExtPrivKey, std::string &strBase58ExtPubKey, bool overwrite)
 {
     LOCK(cs_coreWallet);
 
@@ -132,22 +132,50 @@ bool Wallet::HDSetChainPath(const std::string& chainPathIn, bool generateMaster,
 
         if (fragment == "m")
         {
-            //generate a master key seed
-            //currently seed size is fixed to 256bit
-            assert(vSeed.size() == 32);
-            if (generateMaster)
+            CExtKey bip32MasterKey;
+
+            if (!strBase58ExtPrivKey.empty())
             {
-                RandAddSeedPerfmon();
-                do {
-                    GetRandBytes(&vSeed[0], vSeed.size());
-                } while (!eccrypto::Check(&vSeed[0]));
+                //user has provided a master private key
+                std::vector<unsigned char> vchTemp;
+                CBitcoinExtKey b58key(strBase58ExtPrivKey);
+                bip32MasterKey = b58key.GetKey();
+                if (!bip32MasterKey.key.IsValid())
+                    throw std::runtime_error("CWallet::HDAddHDChain(): Given extended master private key is invalid (base58check decode failed).");
+                vSeed.resize(BIP32_EXTKEY_SIZE);
+
+                //fill the seed, and re/missuse it for the 74byte CExtKey
+                bip32MasterKey.Encode(&vSeed[0]);
+            }
+            else
+            {
+                //generate a master key seed
+                //currently seed size is fixed to 256bit
+                assert(vSeed.size() == 32);
+                if (generateMaster)
+                {
+                    RandAddSeedPerfmon();
+                    do {
+                        GetRandBytes(&vSeed[0], vSeed.size());
+                    } while (!eccrypto::Check(&vSeed[0]));
+                }
+
+                bip32MasterKey.SetMaster(&vSeed[0], vSeed.size());
             }
 
-            CExtKey bip32MasterKey;
-            bip32MasterKey.SetMaster(&vSeed[0], vSeed.size());
+            CExtPubKey masterPubKey = bip32MasterKey.Neuter();
+            CBitcoinExtKey b58cKey;
+            CBitcoinExtPubKey b58cPubkey;
+            b58cKey.SetKey(bip32MasterKey);
+            b58cPubkey.SetKey(masterPubKey);
 
-            CBitcoinExtKey b58key;
-            b58key.SetKey(bip32MasterKey);
+            if (strBase58ExtPrivKey.empty())
+            {
+                //only set the priv key (pass by ref) if no string has passed
+                strBase58ExtPrivKey = b58cKey.ToString();
+            }
+
+            strBase58ExtPubKey = b58cPubkey.ToString();
             chainId = bip32MasterKey.key.GetPubKey().GetHash();
 
             //only one chain per master seed is allowed

@@ -471,13 +471,18 @@ UniValue hdaddchain(const UniValue& params, bool fHelp)
     static RPCParamEntry allowedParams[] = {
         { false, "chainpath", VSTR, "chainpath for hd wallet structure\nm stands for master, c for internal/external key-switch, k stands for upcounting child key index", "m/44h/0h/0h/c/k", "m/32h/c/k"},
         { false, "seed", VSTR, "use this seed for master key generation", "", "abcdef..."},
+        { false, "masterprivkey", VSTR, "use the given extended master private key encoded in base58check as master key", "", "xpriv...."},
     };
-    VerifyParams("hdaddchain", params, fHelp, allowedParams, 2,
+    VerifyParams("hdaddchain", params, fHelp, allowedParams, 3,
                  "\nList all commands, or get help for a specified command.\n"
                  "%args%"
                  "\nResult\n"
                  "{\n"
-                 "  \"seed_hex\" : \"<hexstr>\",  (string) seed used during master key generation (only if no masterseed hex was provided\n"
+                 "  \"seed_hex\" : \"<hexstr>\",                (string) seed used during master key generation (only if no masterseed hex was provided\n"
+                 "  \"chainid\" : \"<string>\",                 (string) the generated chain id (sha256 of the masterpubkey)\n"
+                 "  \"chainpath\" : \"<string>\",               (string) chainpath for keygeneration\n"
+                 "  \"extended_master_pubkey\" : \"<string>\",  (string) base58check encoded extended master public key\n"
+                 "  \"extended_master_privkey\" : \"<string>\", (string) base58check encoded extended master private key\n"
                  "}\n"
                  "\n%examples%"
                  );
@@ -486,6 +491,10 @@ UniValue hdaddchain(const UniValue& params, bool fHelp)
     Wallet *wallet = WalletFromParams(params);
     UniValue chainpathParam = ValueFromParams(params, "chainpath");
     UniValue seedParam = ValueFromParams(params, "seed");
+    UniValue masterPrivKey = ValueFromParams(params, "masterprivkey");
+
+    std::string strBase58cPrivKey;
+    std::string strBase58cPubKey;
 
     const unsigned int bip32MasterSeedLength = 32;
     CKeyingMaterial vSeed = CKeyingMaterial(bip32MasterSeedLength);
@@ -508,12 +517,24 @@ UniValue hdaddchain(const UniValue& params, bool fHelp)
         memory_cleanse(&seed[0], bip32MasterSeedLength);
         fGenerateMasterSeed = false;
     }
-    
-    wallet->HDSetChainPath(chainPath, fGenerateMasterSeed, vSeed, chainId);
+    else
+    {
+        if (!masterPrivKey.isNull() && masterPrivKey.isStr())
+            strBase58cPrivKey = masterPrivKey.get_str();
+    }
+
+    wallet->HDAddHDChain(chainPath, fGenerateMasterSeed, vSeed, chainId, strBase58cPrivKey, strBase58cPubKey);
     if (fGenerateMasterSeed)
         result.push_back(Pair("seed_hex", HexStr(vSeed)));
     result.push_back(Pair("chainid", chainId.GetHex()));
     result.push_back(Pair("chainpath", chainPath));
+    result.push_back(Pair("extended_master_pubkey", strBase58cPubKey));
+    result.push_back(Pair("extended_master_privkey", strBase58cPrivKey));
+
+    memory_cleanse(&vSeed[0], bip32MasterSeedLength);
+    memory_cleanse(&strBase58cPrivKey[0], strBase58cPrivKey.size());
+    memory_cleanse(&strBase58cPubKey[0], strBase58cPubKey.size());
+
     return result;
 }
 
