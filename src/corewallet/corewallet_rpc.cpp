@@ -175,16 +175,31 @@ void VerifyParams(const std::string &callname, const UniValue& params, bool forc
                     hasType = val.getType();
                     if (param->vtype == VSTR && val.isStr())
                         typeCheck = true;
-                    if (param->vtype == VNUM)
+                    else if (param->vtype == VNUM && val.isStr())
                     {
                         UniValue testVal(UniValue::VNUM);
                         testVal.setNumStr(val.get_str()); //also allow VSTR if it can be converted to VNUM
                         if (testVal.isNum())
                             typeCheck = true;
                     }
-                    if ( (param->vtype == VBOOL && val.isBool() ) || (val.isStr() && (boost::to_lower_copy(val.get_str()) == "true" || val.get_str() == "1")))
+                    else if (param->vtype == VNUM && val.isNum())
+                    {
                         typeCheck = true;
-                    if (param->vtype == VFLEX)
+                    }
+                    else if (param->vtype == VOBJ && val.isStr())
+                    {
+                        UniValue testVal(UniValue::VOBJ);
+                        testVal.read(val.get_str());
+                        if (testVal.isObject())
+                            typeCheck = true;
+                    }
+                    if (param->vtype == VOBJ && val.isObject())
+                    {
+                        typeCheck = true;
+                    }
+                    else if ( (param->vtype == VBOOL && val.isBool() ) || (val.isStr() && (boost::to_lower_copy(val.get_str()) == "true" || val.get_str() == "1")))
+                        typeCheck = true;
+                    else if (param->vtype == VFLEX)
                         typeCheck = true;
 
                     break;
@@ -264,7 +279,7 @@ UniValue ValueFromParams(const UniValue& params, const std::string& key, UniValu
         }
         if (forceType == UniValue::VBOOL)
         {
-            if (val.isStr() && ( boost::to_lower_copy(val.get_str()) == "true" || val.get_str() == "1" ))
+            if ( (val.isBool() && val.isTrue()) ||  (val.isStr() && ( boost::to_lower_copy(val.get_str()) == "true" || val.get_str() == "1" )) )
                 val.setBool(true);
             else
                 val.setBool(false);
@@ -860,8 +875,8 @@ UniValue getbalance(const UniValue& params, bool fHelp)
 UniValue createtx(const UniValue& params, bool fHelp)
 {
     static RPCParamEntry allowedParams[] = {
-        { true, "sendto", VSTR, "object containing n bitcoin/value pairs", "", "{\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\":10.0}"},
-        { false, "send", VBOOL, "is set, the transaction will be broadcasted", "false", "true"},
+        { true, "sendto", VOBJ, "object containing n bitcoin/value pairs", "", "{\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\":10.0}"},
+        { true, "send", VBOOL, "is set, the transaction will be broadcasted", "false", "true"},
     };
 
     VerifyParams("createtx", params, fHelp, allowedParams, 2,
@@ -880,7 +895,7 @@ UniValue createtx(const UniValue& params, bool fHelp)
                  "]\n"
                  "\n%examples%"
                  );
-    
+
     Wallet *wallet = WalletFromParams(params);
     std::vector<std::pair<CBitcoinAddress, CAmount> > sendToList;
 
