@@ -203,11 +203,17 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             ssKey >> hash;
             WalletTx wtx;
             ssValue >> wtx;
-            pCoreWallet->AddToWallet(wtx, true);
+
+            //check if we don't load a invalid transaction
+            CValidationState state;
+            if (!(WalletTx::CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
+                return false;
+
+            if (wtx.nOrderPos > pCoreWallet->nHighestOrderPos)
+                pCoreWallet->nHighestOrderPos = wtx.nOrderPos;
+
+            pCoreWallet->AddToWallet(wtx, NULL, true);
         }
-
-
-
     } catch (...)
     {
         return false;

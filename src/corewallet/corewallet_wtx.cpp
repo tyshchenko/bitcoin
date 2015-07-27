@@ -43,14 +43,6 @@ int WalletTx::GetDepthInMainChainInternal(const CBlockIndex* &pindexRet) const
     if (!pindex)
         return 0;
 
-    // Make sure the merkle branch connects to this block
-    if (!fMerkleVerified)
-    {
-        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != pindex->hashMerkleRoot)
-            return 0;
-        fMerkleVerified = true;
-    }
-
     pindexRet = pindex;
     return pwallet->GetActiveChainHeight() - pindex->nHeight + 1;
 }
@@ -108,6 +100,63 @@ bool WalletTx::GetCache(const enum CREDIT_DEBIT_TYPE &balanceType, const isminef
     std::pair<bool, CAmount> value = cacheMap[key];
     amountOut = value.second;
     return value.first;
+}
+
+bool WalletTx::CheckTransaction(const CTransaction& tx, CValidationState &state)
+{
+    // Basic checks that don't depend on any context
+    if (tx.vin.empty())
+        return state.DoS(10, error("CheckTransaction(): vin empty"),
+                         REJECT_INVALID, "bad-txns-vin-empty");
+    if (tx.vout.empty())
+        return state.DoS(10, error("CheckTransaction(): vout empty"),
+                         REJECT_INVALID, "bad-txns-vout-empty");
+    // Size limits
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+        return state.DoS(100, error("CheckTransaction(): size limits failed"),
+                         REJECT_INVALID, "bad-txns-oversize");
+
+    // Check for negative or overflow output values
+    CAmount nValueOut = 0;
+    BOOST_FOREACH(const CTxOut& txout, tx.vout)
+    {
+        if (txout.nValue < 0)
+            return state.DoS(100, error("CheckTransaction(): txout.nValue negative"),
+                             REJECT_INVALID, "bad-txns-vout-negative");
+        if (txout.nValue > MAX_MONEY)
+            return state.DoS(100, error("CheckTransaction(): txout.nValue too high"),
+                             REJECT_INVALID, "bad-txns-vout-toolarge");
+        nValueOut += txout.nValue;
+        if (!MoneyRange(nValueOut))
+            return state.DoS(100, error("CheckTransaction(): txout total out of range"),
+                             REJECT_INVALID, "bad-txns-txouttotal-toolarge");
+    }
+
+    // Check for duplicate inputs
+    std::set<COutPoint> vInOutPoints;
+    BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    {
+        if (vInOutPoints.count(txin.prevout))
+            return state.DoS(100, error("CheckTransaction(): duplicate inputs"),
+                             REJECT_INVALID, "bad-txns-inputs-duplicate");
+        vInOutPoints.insert(txin.prevout);
+    }
+
+    if (tx.IsCoinBase())
+    {
+        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100)
+            return state.DoS(100, error("CheckTransaction(): coinbase script size"),
+                             REJECT_INVALID, "bad-cb-length");
+    }
+    else
+    {
+        BOOST_FOREACH(const CTxIn& txin, tx.vin)
+        if (txin.prevout.IsNull())
+            return state.DoS(10, error("CheckTransaction(): prevout is null"),
+                             REJECT_INVALID, "bad-txns-prevout-null");
+    }
+    
+    return true;
 }
 
 }; //end namespace

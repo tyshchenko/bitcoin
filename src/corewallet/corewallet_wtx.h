@@ -162,6 +162,9 @@ public:
 
     //get a value from in-mem cache
     bool GetCache(const enum CREDIT_DEBIT_TYPE &balanceType, const isminefilter& filter, CAmount &amountOut) const;
+
+    //check if a transaction is valid
+    static bool CheckTransaction(const CTransaction& tx, CValidationState &state);
 };
 
 

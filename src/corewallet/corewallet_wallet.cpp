@@ -427,7 +427,7 @@ bool Wallet::IsTrustedWTx(const WalletTx &wtx) const
     // Quick answer in most cases
     if (!coreInterface.CheckFinalTx(wtx))
         return false;
-    int nDepth = wtx.GetDepthInMainChain();
+    int nDepth = wtx.GetDepthInMainChain(); //-1 = not in chain, not in mempool, 0 = in mempool
     if (nDepth >= 1)
         return true;
     if (nDepth < 0)
@@ -996,7 +996,7 @@ bool Wallet::CommitTransaction(WalletTx& wtxNew, CReserveKey& reservekey)
 
     // Add tx to wallet, because if it has change it's also ours,
     // otherwise just for transaction history.
-    AddToWallet(wtxNew, false);
+    AddToWallet(wtxNew, NULL, false);
 
     // Notify that old coins are spent
     {
@@ -1075,7 +1075,7 @@ bool Wallet::RelayWalletTransaction(const WalletTx &wtx)
  ######################
 */
 
-bool Wallet::AddToWallet(const WalletTx& wtxIn, bool fOnlyInMemory)
+bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlock *pblock, bool fOnlyInMemory)
 {
     LOCK(cs_coreWallet);
 
@@ -1083,7 +1083,6 @@ bool Wallet::AddToWallet(const WalletTx& wtxIn, bool fOnlyInMemory)
 
     if (fOnlyInMemory)
     {
-        //TODO add CheckTransaction from main.cpp like check
         mapWallet[hash] = wtxIn;
         mapWallet[hash].BindWallet(this);
         AddToSpends(hash);
@@ -1098,50 +1097,47 @@ bool Wallet::AddToWallet(const WalletTx& wtxIn, bool fOnlyInMemory)
         if (fInsertedNew)
         {
             wtx.nTimeReceived = GetAdjustedTime();
-            wtx.nOrderPos = 0; //IncOrderPosNext(pwalletdb);
+            wtx.nOrderPos = nHighestOrderPos++;
 
             wtx.nTimeSmart = wtx.nTimeReceived;
-            if (!wtxIn.hashBlock.IsNull())
+            if (pblock)
             {
-                const CBlockIndex *possibleIndex = GetBlockIndex(wtxIn.hashBlock);
-                if (possibleIndex)
+                int64_t latestNow = wtx.nTimeReceived;
+                int64_t latestEntry = 0;
                 {
-                    int64_t latestNow = wtx.nTimeReceived;
-                    int64_t latestEntry = 0;
+                    // Tolerate times up to the last timestamp in the wallet not more than 5 minutes into the future
+                    int64_t latestTolerated = latestNow + 300;
+                    WtxItems txOrdered = OrderedTxItems();
+                    for (WtxItems::reverse_iterator it = txOrdered.rbegin(); it != txOrdered.rend(); ++it)
                     {
-                        // Tolerate times up to the last timestamp in the wallet not more than 5 minutes into the future
-                        int64_t latestTolerated = latestNow + 300;
-                        WtxItems txOrdered = OrderedTxItems();
-                        for (WtxItems::reverse_iterator it = txOrdered.rbegin(); it != txOrdered.rend(); ++it)
-                        {
-                            WalletTx *const pwtx = (*it).second;
-                            if (pwtx == &wtx)
-                                continue;
+                        WalletTx *const pwtx = (*it).second;
+                        if (pwtx == &wtx)
+                            continue;
 
-                            int64_t nSmartTime = 0;
-                            if (pwtx)
-                            {
-                                nSmartTime = pwtx->nTimeSmart;
-                                if (!nSmartTime)
-                                    nSmartTime = pwtx->nTimeReceived;
-                            }
-                            if (nSmartTime <= latestTolerated)
-                            {
-                                latestEntry = nSmartTime;
-                                if (nSmartTime > latestNow)
-                                    latestNow = nSmartTime;
-                                break;
-                            }
+                        int64_t nSmartTime = 0;
+                        if (pwtx)
+                        {
+                            nSmartTime = pwtx->nTimeSmart;
+                            if (!nSmartTime)
+                                nSmartTime = pwtx->nTimeReceived;
+                        }
+                        if (nSmartTime <= latestTolerated)
+                        {
+                            latestEntry = nSmartTime;
+                            if (nSmartTime > latestNow)
+                                latestNow = nSmartTime;
+                            break;
                         }
                     }
-
-                    int64_t blocktime = possibleIndex->GetBlockTime();
-                    wtx.nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
                 }
-                else
-                    LogPrintf("AddToWallet(): found %s in block %s not in index\n",
-                              wtxIn.GetHash().ToString(),
-                              wtxIn.hashBlock.ToString());
+                int64_t blocktime = pblock->GetBlockHeader().GetBlockTime();
+                wtx.nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
+            }
+            else
+            {
+                LogPrintf("AddToWallet(): found %s in block %s not in index\n",
+                          wtxIn.GetHash().ToString(),
+                          wtxIn.hashBlock.ToString());
             }
             AddToSpends(hash);
         }
@@ -1204,7 +1200,11 @@ bool Wallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblo
             if (pblock)
                 wtx.SetMerkleBranch(*pblock);
 
-            return AddToWallet(wtx, false);
+            // Make sure the merkle branch connects to this block
+            if (CBlock::CheckMerkleBranch(wtx.GetHash(), wtx.vMerkleBranch, wtx.nIndex) != pblock->GetBlockHeader().hashMerkleRoot)
+                return 0;
+
+            return AddToWallet(wtx, pblock, false);
         }
     }
     return false;

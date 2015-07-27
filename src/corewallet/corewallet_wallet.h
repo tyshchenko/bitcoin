@@ -67,7 +67,8 @@ public:
     std::set<COutPoint> setLockedCoins; //! set for locking coins (in mem only)
 
     int64_t nTimeFirstKey; //!oldest key timestamp
-
+    int64_t nHighestOrderPos; //!highest order pos cache
+    
     //wallet backends
     FileDB *walletPrivateDB;
     FileDB *walletCacheDB;
@@ -112,7 +113,7 @@ public:
      */
     //! Add a transaction to the mapWallet (if fOnlyInMemory is false, it will also be stored into the database)
     //no signal are called if fOnlyInMemory == true
-    bool AddToWallet(const WalletTx& wtxIn, bool fOnlyInMemory);
+    bool AddToWallet(const WalletTx& wtxIn, const CBlock* pblock, bool fOnlyInMemory);
 
     CAmount GetDebit(const CTxIn& txin, const isminefilter& filter) const;
     CAmount GetDebit(const CTransaction& tx, const isminefilter& filter) const;

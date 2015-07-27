@@ -824,7 +824,7 @@ UniValue getbalance(const UniValue& params, bool fHelp)
         { false, "includewatchonly", VBOOL, "Also include balance in watchonly addresses (see 'importaddress')", "false", "true"},
     };
 
-    VerifyParams("listunspent", params, fHelp, allowedParams, 2,
+    VerifyParams("getbalance", params, fHelp, allowedParams, 2,
                  "\nReturns the total available balance.\n"
                  "%args%"
                  "\nResult:\n"
