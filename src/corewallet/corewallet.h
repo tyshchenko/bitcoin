@@ -27,7 +27,8 @@ namespace CoreWallet {
         Wallet* AddNewWallet(const std::string& walletID);
 
         //CValidationInterface listener, will ask all wallets to sync a given transaction
-        void SyncTransaction(const CTransaction& tx, const CBlock* pblock);
+        void SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock);
+
     protected:
         CCriticalSection cs_mapWallets;
         std::map<std::string, WalletModel> mapWallets; //!map with wallet metadata

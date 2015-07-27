@@ -51,6 +51,11 @@ void AppendHelpMessageString(std::string& strUsage, bool debugHelp)
 Manager::Manager()
 {
     ReadWalletLists();
+
+    std::pair<std::string, WalletModel> walletAndMetadata;
+    BOOST_FOREACH(walletAndMetadata, mapWallets)
+        if (!mapWallets[walletAndMetadata.first].pWallet)
+            mapWallets[walletAndMetadata.first].pWallet = new Wallet(walletAndMetadata.first);
 }
 
 void Manager::ReadWalletLists()
@@ -156,19 +161,16 @@ Manager* GetManager()
     return managerSharedInstance;
 }
 
-void Manager::SyncTransaction(const CTransaction& tx, const CBlock* pblock)
+void Manager::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock)
 {
     LOCK(cs_mapWallets);
     {
         std::pair<std::string, WalletModel> walletAndMetadata;
-        BOOST_FOREACH(walletAndMetadata, mapWallets) {
-            //TODO: needs a better approach
-            //Open the wallet within the SyncTransaction call is probably a bad idea, need to be changed
-            //Also we lock all wallets during the new wallet open (will map everything to mem)
-            if (!mapWallets[walletAndMetadata.first].pWallet)
-                mapWallets[walletAndMetadata.first].pWallet = new Wallet(walletAndMetadata.first);
-
-            mapWallets[walletAndMetadata.first].pWallet->SyncTransaction(tx, pblock);
+        BOOST_FOREACH(walletAndMetadata, mapWallets)
+        {
+            Wallet *pWallet = mapWallets[walletAndMetadata.first].pWallet;
+            if (pWallet)
+                pWallet->SyncTransaction(tx, pindex, pblock);
         }
     }
 }

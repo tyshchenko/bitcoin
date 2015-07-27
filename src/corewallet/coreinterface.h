@@ -30,6 +30,9 @@ public:
     CAmount EstimateFee(int confirmationTarget, size_t txSize) const;
     double EstimatePriority(int confirmationTarget) const;
     bool AllowFree(double dPriority) const;
+
+    static CBlockIndex GetActiveChainTip();
+    static bool IsInBestChain(uint256 blockhash);
 };
 
 } // end namespace

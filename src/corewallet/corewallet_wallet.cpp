@@ -36,6 +36,8 @@ CFeeRate Wallet::minTxFee = CFeeRate(1000);
 
 Wallet::Wallet(std::string strWalletFileIn)
 {
+    bestChainTip = CoreInterface::GetActiveChainTip();
+
     //instantiate a wallet backend object and maps the stored values
     walletPrivateDB = new FileDB(strWalletFileIn+".private.logdb");
     walletPrivateDB->LoadWallet(this);
@@ -420,12 +422,24 @@ void Wallet::ListLockedCoins(std::vector<COutPoint>& vOutpts)
  * populate vCoins with vector of available COutputs.
  */
 
+bool Wallet::IsFinalTx(const WalletTx &tx) const
+{
+    if (tx.nLockTime == 0)
+        return true;
+    if ((int64_t)tx.nLockTime < ((int64_t)tx.nLockTime < LOCKTIME_THRESHOLD ? (int64_t)bestChainTip.nHeight : GetAdjustedTime()))
+        return true;
+    BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    if (!txin.IsFinal())
+        return false;
+    return true;
+}
+
 bool Wallet::IsTrustedWTx(const WalletTx &wtx) const
 {
     AssertLockHeld(cs_coreWallet);
 
     // Quick answer in most cases
-    if (!coreInterface.CheckFinalTx(wtx))
+    if (!IsFinalTx(wtx))
         return false;
     int nDepth = wtx.GetDepthInMainChain(); //-1 = not in chain, not in mempool, 0 = in mempool
     if (nDepth >= 1)
@@ -996,7 +1010,7 @@ bool Wallet::CommitTransaction(WalletTx& wtxNew, CReserveKey& reservekey)
 
     // Add tx to wallet, because if it has change it's also ours,
     // otherwise just for transaction history.
-    AddToWallet(wtxNew, NULL, false);
+    AddToWallet(wtxNew, NULL, NULL, false);
 
     // Notify that old coins are spent
     {
@@ -1075,7 +1089,7 @@ bool Wallet::RelayWalletTransaction(const WalletTx &wtx)
  ######################
 */
 
-bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlock *pblock, bool fOnlyInMemory)
+bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlockIndex* pindex, const CBlock* pblock, bool fOnlyInMemory)
 {
     LOCK(cs_coreWallet);
 
@@ -1098,10 +1112,15 @@ bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlock *pblock, bool fOnly
         {
             wtx.nTimeReceived = GetAdjustedTime();
             wtx.nOrderPos = nHighestOrderPos++;
+            wtx.nHeight = -1;
 
             wtx.nTimeSmart = wtx.nTimeReceived;
             if (pblock)
             {
+                 //if a blockindex was given (current chaintip) use the the blockIndex height as wtx height
+                if (pindex)
+                    wtx.nHeight = pindex->nHeight;
+
                 int64_t latestNow = wtx.nTimeReceived;
                 int64_t latestEntry = 0;
                 {
@@ -1164,6 +1183,12 @@ bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlock *pblock, bool fOnly
             }
         }
 
+        //if no blockindex and no block was given, assume wtx is in the mempool
+        if (!pindex && !pblock)
+        {
+            wtx.nHeight = 0;
+        }
+
         //// debug print
         LogPrintf("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""), (fUpdated ? "update" : ""));
 
@@ -1186,7 +1211,7 @@ bool Wallet::AddToWallet(const WalletTx& wtxIn, const CBlock *pblock, bool fOnly
  * pblock is optional, but should be provided if the transaction is known to be in a block.
  * If fUpdate is true, existing transactions will be updated.
  */
-bool Wallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate)
+bool Wallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlockIndex *pindex, const CBlock* pblock, bool fUpdate)
 {
     {
         AssertLockHeld(cs_coreWallet);
@@ -1204,7 +1229,7 @@ bool Wallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblo
             if (CBlock::CheckMerkleBranch(wtx.GetHash(), wtx.vMerkleBranch, wtx.nIndex) != pblock->GetBlockHeader().hashMerkleRoot)
                 return 0;
 
-            return AddToWallet(wtx, pblock, false);
+            return AddToWallet(wtx, pindex, pblock, false);
         }
     }
     return false;
@@ -1280,10 +1305,12 @@ bool Wallet::WriteWTXToDisk(const WalletTx &wtx)
     return walletCacheDB->WriteTx(wtx.GetHash(), wtx);
 }
 
-void Wallet::SyncTransaction(const CTransaction& tx, const CBlock* pblock)
+void Wallet::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock)
 {
     LOCK(cs_coreWallet);
-    if (!AddToWalletIfInvolvingMe(tx, pblock, true))
+    bestChainTip = *pindex;
+
+    if (!AddToWalletIfInvolvingMe(tx, pindex, pblock, true))
         return; // Not one of ours
 
     // If a transaction changes 'conflicted' state, that changes the balance

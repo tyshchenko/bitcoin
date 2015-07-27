@@ -11,6 +11,8 @@
 #include "corewallet/corewallet_wallet.h"
 #include "corewallet/corewallet_wtx.h"
 
+#include "corewallet/coreinterface.h"
+
 namespace CoreWallet
 {
     
@@ -204,6 +206,12 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             WalletTx wtx;
             ssValue >> wtx;
 
+            if (!CoreInterface::IsInBestChain(wtx.hashBlock))
+            {
+                strErr = "Error reading wallet database: wtx was not found in bestchain";
+                return false;
+            }
+
             //check if we don't load a invalid transaction
             CValidationState state;
             if (!(WalletTx::CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
@@ -212,7 +220,7 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             if (wtx.nOrderPos > pCoreWallet->nHighestOrderPos)
                 pCoreWallet->nHighestOrderPos = wtx.nOrderPos;
 
-            pCoreWallet->AddToWallet(wtx, NULL, true);
+            pCoreWallet->AddToWallet(wtx, NULL, NULL, true);
         }
     } catch (...)
     {
@@ -232,7 +240,6 @@ bool FileDB::LoadWallet(Wallet* pCoreWallet)
     bool fAutoTransaction = TxnBegin();
     
     try {
-        LOCK(pCoreWallet->cs_coreWallet);
         for (FileDB::const_iterator it = begin(); it != end(); it++)
         {
             // Read next record

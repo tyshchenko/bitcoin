@@ -6,7 +6,10 @@
 #include "corewallet/coreinterface.h"
 
 #include "main.h"
+#include "txmempool.h"
 #include "net.h"
+#include "policy/policy.h"
+
 
 namespace CoreWallet
 {
@@ -76,6 +79,22 @@ double CoreInterface::EstimatePriority(int confirmationTarget) const
 bool CoreInterface::AllowFree(double dPriority) const
 {
     return AllowFree(dPriority);
+}
+
+bool CoreInterface::IsInBestChain(uint256 blockhash)
+{
+    LOCK(cs_main);
+    // Find the block it claims to be in
+    BlockMap::iterator mi = mapBlockIndex.find(blockhash);
+    if (mi == mapBlockIndex.end())
+        return false;
+
+    return true;
+}
+
+CBlockIndex CoreInterface::GetActiveChainTip()
+{
+    return *chainActive.Tip();
 }
 
 } // end namespace

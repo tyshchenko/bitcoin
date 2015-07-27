@@ -39,12 +39,13 @@ class WalletTx : public CTransaction
 {
 private:
     const Wallet* pwallet;
-    int GetDepthInMainChainInternal(const CBlockIndex* &pindexRet) const;
+    int GetDepthInMainChainInternal() const;
     
 public:
     static const int CURRENT_VERSION=1;
     uint8_t nVersion;
 
+    int nHeight;
     mapValue_t mapValue;
     std::vector<std::pair<std::string, std::string> > vOrderForm;
     std::vector<uint32_t> vChangeOutputs; //! stores the positions of the change vouts
@@ -95,6 +96,7 @@ public:
         fFromMe = false;
         nChangeCached = 0;
         nOrderPos = -1;
+        nHeight = 0;
     }
 
     ADD_SERIALIZE_METHODS;
@@ -102,6 +104,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(*(CTransaction*)this);
+        READWRITE(VARINT(nHeight));
         READWRITE(hashBlock);
         READWRITE(vMerkleBranch);
         READWRITE(nIndex);
@@ -150,9 +153,8 @@ public:
      *  0  : in memory pool, waiting to be included in a block
      * >=1 : this many blocks deep in the main chain
      */
-    int GetDepthInMainChain(const CBlockIndex* &pindexRet) const;
-    int GetDepthInMainChain() const { const CBlockIndex *pindexRet; return GetDepthInMainChain(pindexRet); }
-    bool IsInMainChain() const { const CBlockIndex *pindexRet; return GetDepthInMainChainInternal(pindexRet) > 0; }
+    int GetDepthInMainChain() const;
+    bool IsInMainChain() const { return GetDepthInMainChainInternal() > 0; }
     int GetBlocksToMaturity() const;
 
     bool SetMerkleBranch(const CBlock& block);

@@ -860,7 +860,7 @@ UniValue getbalance(const UniValue& params, bool fHelp)
 UniValue createtx(const UniValue& params, bool fHelp)
 {
     static RPCParamEntry allowedParams[] = {
-        { false, "sendto", VSTR, "object containing n bitcoin/value pairs", "", "{\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\":10.0}"},
+        { true, "sendto", VSTR, "object containing n bitcoin/value pairs", "", "{\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\":10.0}"},
         { false, "send", VBOOL, "is set, the transaction will be broadcasted", "false", "true"},
     };
 

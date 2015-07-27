@@ -40,6 +40,9 @@ private:
     //!default coin selection function
     bool SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const WalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL) const;
 
+    //!height index
+    std::map<int, std::vector<WalletTx*> > mapHeightIndex;
+
     //!wallet tx map
     std::map<uint256, WalletTx> mapWallet;
 
@@ -51,12 +54,13 @@ protected:
     bool fBroadcastTransactions;
 
     //!Add a transaction to the wallet if it's relevant
-    bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate);
+    bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlockIndex *pindex, const CBlock* pblock, bool fUpdate);
 
     //!write a wtx to disk
     bool WriteWTXToDisk(const WalletTx &wtx);
     const WalletTx* GetWalletTx(const uint256& hash) const;
     bool IsTrustedWTx(const WalletTx &wtx) const;
+    bool IsFinalTx(const WalletTx &tx) const;
 
 public:
     static CFeeRate minTxFee;
@@ -68,7 +72,8 @@ public:
 
     int64_t nTimeFirstKey; //!oldest key timestamp
     int64_t nHighestOrderPos; //!highest order pos cache
-    
+    CBlockIndex bestChainTip; //!MEM ONLY: chainTip of bestchain
+
     //wallet backends
     FileDB *walletPrivateDB;
     FileDB *walletCacheDB;
@@ -106,14 +111,14 @@ public:
     bool SetAndStoreAddressBook(const CTxDestination& address, const std::string& purpose);
 
     //! inform wallet about a new arrived transaction
-    void SyncTransaction(const CTransaction& tx, const CBlock* pblock);
-
+    void SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock);
+    
     /*
      receiving stack
      */
     //! Add a transaction to the mapWallet (if fOnlyInMemory is false, it will also be stored into the database)
     //no signal are called if fOnlyInMemory == true
-    bool AddToWallet(const WalletTx& wtxIn, const CBlock* pblock, bool fOnlyInMemory);
+    bool AddToWallet(const WalletTx& wtxIn, const CBlockIndex* pindex, const CBlock* pblock, bool fOnlyInMemory);
 
     CAmount GetDebit(const CTxIn& txin, const isminefilter& filter) const;
     CAmount GetDebit(const CTransaction& tx, const isminefilter& filter) const;

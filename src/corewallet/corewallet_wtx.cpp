@@ -33,27 +33,22 @@ int64_t WalletTx::GetTxTime() const
     return n ? n : nTimeReceived;
 }
 
-int WalletTx::GetDepthInMainChainInternal(const CBlockIndex* &pindexRet) const
+int WalletTx::GetDepthInMainChainInternal() const
 {
     if (hashBlock.IsNull() || nIndex == -1)
-        return 0;
+    {
+        if (nHeight == 0)
+            return 0;
 
-    // Find the block it claims to be in
-    const CBlockIndex* pindex = pwallet->GetBlockIndex(hashBlock, true);
-    if (!pindex)
-        return 0;
+        return -1; //not in mempool, not in a block
+    }
 
-    pindexRet = pindex;
-    return pwallet->GetActiveChainHeight() - pindex->nHeight + 1;
+    return pwallet->bestChainTip.nHeight - nHeight + 1;
 }
 
-int WalletTx::GetDepthInMainChain(const CBlockIndex* &pindexRet) const
+int WalletTx::GetDepthInMainChain() const
 {
-    int nResult = GetDepthInMainChainInternal(pindexRet);
-    if (nResult == 0 && !pwallet->MempoolExists(GetHash()))
-        return -1; // Not in chain, not in mempool
-
-    return nResult;
+    return GetDepthInMainChainInternal();
 }
 
 int WalletTx::GetBlocksToMaturity() const
