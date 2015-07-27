@@ -1223,11 +1223,13 @@ bool Wallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlockIndex 
 
             // Get merkle branch if transaction was found in a block
             if (pblock)
+            {
                 wtx.SetMerkleBranch(*pblock);
 
-            // Make sure the merkle branch connects to this block
-            if (CBlock::CheckMerkleBranch(wtx.GetHash(), wtx.vMerkleBranch, wtx.nIndex) != pblock->GetBlockHeader().hashMerkleRoot)
-                return 0;
+                // Make sure the merkle branch connects to this block
+                if (CBlock::CheckMerkleBranch(wtx.GetHash(), wtx.vMerkleBranch, wtx.nIndex) != pblock->GetBlockHeader().hashMerkleRoot)
+                    return 0;
+            }
 
             return AddToWallet(wtx, pindex, pblock, false);
         }
@@ -1308,7 +1310,8 @@ bool Wallet::WriteWTXToDisk(const WalletTx &wtx)
 void Wallet::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock)
 {
     LOCK(cs_coreWallet);
-    bestChainTip = *pindex;
+    if (pindex && pindex->GetBlockHash() != bestChainTip.GetBlockHash())
+        bestChainTip = *pindex;
 
     if (!AddToWalletIfInvolvingMe(tx, pindex, pblock, true))
         return; // Not one of ours
