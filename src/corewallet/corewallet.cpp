@@ -6,10 +6,10 @@
 #include "corewallet/corewallet.h"
 #include "corewallet/corewallet_db.h"
 #include "corewallet/corewallet_wallet.h"
+#include "main.h"
 #include "rpcserver.h"
 #include "script/script.h"
 #include "ui_interface.h"
-#include "univalue/univalue.h"
 #include "util.h"
 #include "validationinterface.h"
 
@@ -50,12 +50,18 @@ void AppendHelpMessageString(std::string& strUsage, bool debugHelp)
 
 Manager::Manager()
 {
+
+}
+
+void Manager::LoadWallets()
+{
     ReadWalletLists();
 
     std::pair<std::string, WalletModel> walletAndMetadata;
+    LOCK2(cs_main, cs_mapWallets);
     BOOST_FOREACH(walletAndMetadata, mapWallets)
-        if (!mapWallets[walletAndMetadata.first].pWallet)
-            mapWallets[walletAndMetadata.first].pWallet = new Wallet(walletAndMetadata.first);
+    if (!mapWallets[walletAndMetadata.first].pWallet)
+        mapWallets[walletAndMetadata.first].pWallet = new Wallet(walletAndMetadata.first);
 }
 
 void Manager::ReadWalletLists()
@@ -64,7 +70,7 @@ void Manager::ReadWalletLists()
     if (!multiwalletFile.IsNull())
     {
         try {
-            LOCK(cs_mapWallets);
+            LOCK2(cs_main, cs_mapWallets);
             multiwalletFile >> mapWallets;
         } catch (const std::exception&) {
             LogPrintf("CoreWallet: could not read multiwallet metadata file (non-fatal)");
@@ -77,20 +83,20 @@ void Manager::WriteWalletList()
     CAutoFile multiwalletFile(fopen((GetDataDir() / DEFAULT_WALLETS_METADATA_FILE).string().c_str(), "wb"), SER_DISK, CLIENT_VERSION);
     if (!multiwalletFile.IsNull())
     {
-        LOCK(cs_mapWallets);
+        LOCK2(cs_main, cs_mapWallets);
         multiwalletFile << mapWallets;
     }
 }
 
 void LoadAsModule(std::string& warningString, std::string& errorString, bool& stopInit)
 {
-    GetManager();
+    GetManager()->LoadWallets();
 }
 
 Wallet* Manager::AddNewWallet(const std::string& walletID)
 {
     Wallet *newWallet = NULL;
-    LOCK(cs_mapWallets);
+    LOCK2(cs_main, cs_mapWallets);
     {
         if (mapWallets.find(walletID) != mapWallets.end())
             throw std::runtime_error(_("walletid already exists"));
@@ -110,7 +116,7 @@ Wallet* Manager::GetWalletWithID(const std::string& walletIDIn)
 {
     std::string walletID = walletIDIn;
 
-    LOCK(cs_mapWallets);
+    LOCK2(cs_main, cs_mapWallets);
     {
         if (walletID == "" && mapWallets.size() == 1)
             walletID = mapWallets.begin()->first;
@@ -132,7 +138,7 @@ std::vector<std::string> Manager::GetWalletIDs()
     std::vector<std::string> vIDs;
     std::pair<std::string, WalletModel> walletAndMetadata;
 
-    LOCK(cs_mapWallets);
+    LOCK2(cs_main, cs_mapWallets);
     {
         BOOST_FOREACH(walletAndMetadata, mapWallets) {
             vIDs.push_back(walletAndMetadata.first);
@@ -163,7 +169,7 @@ Manager* GetManager()
 
 void Manager::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock)
 {
-    LOCK(cs_mapWallets);
+    LOCK2(cs_main, cs_mapWallets);
     {
         std::pair<std::string, WalletModel> walletAndMetadata;
         BOOST_FOREACH(walletAndMetadata, mapWallets)
@@ -173,6 +179,12 @@ void Manager::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex,
                 pWallet->SyncTransaction(tx, pindex, pblock);
         }
     }
+}
+
+void Manager::ExecuteRPCI(const std::string& strMethod, const UniValue& params, UniValue& result, bool& accept)
+{
+    LOCK2(cs_main, cs_mapWallets);
+    ExecuteRPC(strMethod, params, result, accept);
 }
 
 void GetScriptForMining(boost::shared_ptr<CReserveScript> &script)
@@ -190,7 +202,7 @@ void RegisterRPC()
     //After adding a new endpoint, we can listen to any incomming
     //command over the RPCServer::OnExtendedCommandExecute signal.
     AddJSONRPCURISchema("/corewallet");
-    RPCServer::OnExtendedCommandExecute(boost::bind(&CoreWallet::ExecuteRPC, _1, _2, _3, _4));
+    RPCServer::OnExtendedCommandExecute(boost::bind(&Manager::ExecuteRPCI, GetManager(), _1, _2, _3, _4));
 }
 
 void RegisterSignals()

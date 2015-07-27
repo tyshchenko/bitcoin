@@ -8,7 +8,7 @@
 
 #include "corewallet/corewallet_wallet.h"
 #include "validationinterface.h"
-
+#include "univalue/univalue.h"
 
 namespace CoreWallet {
     class Manager : public CValidationInterface
@@ -16,6 +16,8 @@ namespace CoreWallet {
     public:
         Manager();
         virtual ~Manager() {}
+
+        void LoadWallets();
 
         //!will return a wallet with given walletid, "" (empty string) will return the default wallet (if exists)
         Wallet* GetWalletWithID(const std::string& walletIDIn);
@@ -28,6 +30,9 @@ namespace CoreWallet {
 
         //CValidationInterface listener, will ask all wallets to sync a given transaction
         void SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock);
+
+        //CValidationInterface listener, will ask all wallets to sync a given transaction
+        void ExecuteRPCI(const std::string& strMethod, const UniValue& params, UniValue& result, bool& accept);
 
     protected:
         CCriticalSection cs_mapWallets;
