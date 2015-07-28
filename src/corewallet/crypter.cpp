@@ -292,23 +292,28 @@ bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
     return true;
 }
 
-bool CCryptoKeyStore::EncryptSeed(const CKeyingMaterial& seedIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const
+bool CCryptoKeyStore::EncryptExtendedMasterKey(const CExtKey& keyIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const
 {
     LOCK(cs_KeyStore);
 
-    if (!EncryptSecret(vMasterKey, seedIn, seedPubHash, vchCiphertext))
+    CKeyingMaterial encodedKey;
+    keyIn.Encode(&encodedKey[0]);
+    if (!EncryptSecret(vMasterKey, encodedKey, seedPubHash, vchCiphertext))
         return false;
 
     return true;
 }
 
-bool CCryptoKeyStore::DecryptSeed(const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CKeyingMaterial& seedOut) const
+bool CCryptoKeyStore::DecryptExtendedMasterKey(const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CExtKey& extKeyOut) const
 {
     LOCK(cs_KeyStore);
 
-    if (!DecryptSecret(vMasterKey, vchCiphertextIn, seedPubHash, seedOut))
+    CKeyingMaterial encodedKeyOut;
+    if (!DecryptSecret(vMasterKey, vchCiphertextIn, seedPubHash, encodedKeyOut))
         return false;
-    
+
+    extKeyOut.Decode(&encodedKeyOut[0]);
+
     return true;
 }
 }; //end namespace

@@ -111,8 +111,8 @@ public:
 class CHDKeyStore : public CCryptoKeyStore
 {
 protected:
-    std::map<HDChainID, CKeyingMaterial > mapHDMasterSeeds; //master seeds are stored outside of CHDChain (crypto)
-    std::map<HDChainID, std::vector<unsigned char> > mapHDCryptedMasterSeeds;
+    std::map<HDChainID, CExtKey > mapHDMasterExtendedMasterKey; //extended master private keys are stored outside of CHDChain (crypto)
+    std::map<HDChainID, std::vector<unsigned char> > mapHDCryptedExtendedMasterKeys;
     std::map<CKeyID, CHDPubKey> mapHDPubKeys; //all hd pubkeys of all chains
     std::map<HDChainID, CHDChain> mapChains; //all available chains
 
@@ -120,20 +120,20 @@ protected:
     bool DeriveKey(const CHDPubKey hdPubKey, CKey& keyOut) const;
 
 public:
-    //!add a master seed with a given pubkeyhash (memory only)
-    virtual bool AddMasterSeed(const HDChainID& pubkeyhash, const CKeyingMaterial& masterSeed);
+    //!add a extended master private key with a given pubkeyhash (memory only)
+    virtual bool AddExtendedMasterKey(const HDChainID& pubkeyhash, const CExtKey& extKey);
 
-    //!add a crypted master seed with a given pubkeyhash (memory only)
-    virtual bool AddCryptedMasterSeed(const HDChainID& hash, const std::vector<unsigned char>& vchCryptedSecret);
+    //!add a crypted extended master private key with a given pubkeyhash (memory only)
+    virtual bool AddCryptedExtendedMasterKey(const HDChainID& hash, const std::vector<unsigned char>& vchCryptedSecret);
 
-    //!encrypt existing uncrypted seeds and remove unencrypted data
-    virtual bool EncryptSeeds();
+    //!encrypt existing uncrypted extended master private key and remove unencrypted data
+    virtual bool EncryptExtendedMasterKey();
 
-    //!export the master seed from a given chain id (hash of the master pub key)
-    virtual bool GetMasterSeed(const HDChainID& hash, CKeyingMaterial& seedOut) const;
+    //!export the extended master private key from a given chain id (hash of the master pub key)
+    virtual bool GetExtendedMasterKey(const HDChainID& hash, CExtKey& extKeyOut) const;
 
-    //!get the encrypted master seed of a giveb chain id
-    virtual bool GetCryptedMasterSeed(const HDChainID& hash, std::vector<unsigned char>& vchCryptedSecret) const;
+    //!get the encrypted extened master private key of a giveb chain id
+    virtual bool GetCryptedExtendedMasterKey(const HDChainID& hash, std::vector<unsigned char>& vchCryptedSecret) const;
 
     //!writes all available chain ids to a vector
     virtual bool GetAvailableChainIDs(std::vector<HDChainID>& chainIDs);

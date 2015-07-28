@@ -30,12 +30,12 @@ bool FileDB::WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, cons
     return Write(std::make_pair(kvs_key_key, vchPubKey), std::make_pair(vchPrivKey, Hash(vchKey.begin(), vchKey.end())), false);
 }
 
-bool FileDB::WriteHDMasterSeed(const uint256& hash, const CKeyingMaterial& masterSeed)
+bool FileDB::WriteHDExtendedMasterKey(const uint256& hash, const CExtKey& extKey)
 {
-    return Write(std::make_pair(kvs_hd_master_seed_key, hash), masterSeed);
+    return Write(std::make_pair(kvs_hd_master_seed_key, hash), extKey);
 }
 
-bool FileDB::WriteHDCryptedMasterSeed(const uint256& hash, const std::vector<unsigned char>& vchCryptedSecret)
+bool FileDB::WriteHDCryptedExtendedMasterKey(const uint256& hash, const std::vector<unsigned char>& vchCryptedSecret)
 {
     if (!Write(std::make_pair(kvs_hd_encrypted_master_seed_key, hash), vchCryptedSecret))
         return false;
@@ -46,7 +46,7 @@ bool FileDB::WriteHDCryptedMasterSeed(const uint256& hash, const std::vector<uns
     return true;
 }
 
-bool FileDB::EraseHDMasterSeed(const uint256& hash)
+bool FileDB::EraseHDExtendedMasterKey(const uint256& hash)
 {
     return Erase(std::make_pair(kvs_hd_master_seed_key, hash));
 }
@@ -155,10 +155,10 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
         else if (strType == kvs_hd_master_seed_key)
         {
             uint256 masterPubKeyHash;
-            CKeyingMaterial masterSeed;
+            CExtKey extKey;
             ssKey >> masterPubKeyHash;
-            ssValue >> masterSeed;
-            pCoreWallet->AddMasterSeed(masterPubKeyHash, masterSeed);
+            ssValue >> extKey;
+            pCoreWallet->AddExtendedMasterKey(masterPubKeyHash, extKey);
         }
         else if (strType == kvs_hd_encrypted_master_seed_key)
         {
@@ -166,7 +166,7 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             std::vector<unsigned char> vchCryptedSecret;
             ssKey >> masterPubKeyHash;
             ssValue >> vchCryptedSecret;
-            pCoreWallet->AddCryptedMasterSeed(masterPubKeyHash, vchCryptedSecret);
+            pCoreWallet->AddCryptedExtendedMasterKey(masterPubKeyHash, vchCryptedSecret);
         }
         else if (strType == kvs_hdactivechain_key)
         {

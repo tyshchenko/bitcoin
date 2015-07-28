@@ -185,7 +185,7 @@ bool Wallet::HDAddHDChain(const std::string& chainPathIn, bool generateMaster, C
             if (GetChain(chainId, possibleChain) && possibleChain.IsValid())
                 throw std::runtime_error("CoreWallet::SetHDChainPath(): Only one chain per masterseed is allowed.");
 
-            if (!AddMasterSeed(chainId, vSeed))
+            if (!AddExtendedMasterKey(chainId, bip32MasterKey))
                 throw std::runtime_error("CoreWallet::SetHDChainPath(): Could not store master seed.");
 
             //keep the master pubkeyhash for chain identifying
@@ -194,15 +194,15 @@ bool Wallet::HDAddHDChain(const std::string& chainPathIn, bool generateMaster, C
             if (IsCrypted())
             {
                 std::vector<unsigned char> vchCryptedSecret;
-                GetCryptedMasterSeed(chainId, vchCryptedSecret);
+                GetCryptedExtendedMasterKey(chainId, vchCryptedSecret);
 
-                if (!walletPrivateDB->WriteHDCryptedMasterSeed(chainId, vchCryptedSecret))
-                    throw std::runtime_error("CoreWallet::SetHDChainPath(): Writing hdmasterseed failed!");
+                if (!walletPrivateDB->WriteHDCryptedExtendedMasterKey(chainId, vchCryptedSecret))
+                    throw std::runtime_error("CoreWallet::SetHDChainPath(): Writing hdmasterkey failed!");
             }
             else
             {
-                if (!walletPrivateDB->WriteHDMasterSeed(chainId, vSeed))
-                    throw std::runtime_error("CoreWallet::SetHDChainPath(): Writing cryted hdmasterseed failed!");
+                if (!walletPrivateDB->WriteHDExtendedMasterKey(chainId, bip32MasterKey))
+                    throw std::runtime_error("CoreWallet::SetHDChainPath(): Writing cryted hdmasterkey failed!");
             }
 
             //set active hd chain
@@ -297,9 +297,9 @@ bool Wallet::HDGetNextChildPubKey(const HDChainID& chainIDIn, CPubKey &pubKeyOut
     return true;
 }
 
-bool Wallet::EncryptHDSeeds(CKeyingMaterial& vMasterKeyIn)
+bool Wallet::EncryptHDExtendedMasterKeys(CKeyingMaterial& vMasterKeyIn)
 {
-    EncryptSeeds();
+    EncryptExtendedMasterKey(); //in hdkeystore
 
     std::vector<HDChainID> chainIds;
     GetAvailableChainIDs(chainIds);
@@ -307,11 +307,11 @@ bool Wallet::EncryptHDSeeds(CKeyingMaterial& vMasterKeyIn)
     BOOST_FOREACH(HDChainID& chainId, chainIds)
     {
         std::vector<unsigned char> vchCryptedSecret;
-        if (!GetCryptedMasterSeed(chainId, vchCryptedSecret))
-            throw std::runtime_error("CoreWallet::EncryptHDSeeds(): Encrypting seeds failed!");
+        if (!GetCryptedExtendedMasterKey(chainId, vchCryptedSecret))
+            throw std::runtime_error("CoreWallet::EncryptHDExtendedMasterKeys(): Encrypting hdmasterkey failed!");
         
-        if (!walletPrivateDB->WriteHDCryptedMasterSeed(chainId, vchCryptedSecret))
-            throw std::runtime_error("CoreWallet::EncryptHDSeeds(): Writing hdmasterseed failed!");
+        if (!walletPrivateDB->WriteHDCryptedExtendedMasterKey(chainId, vchCryptedSecret))
+            throw std::runtime_error("CoreWallet::EncryptHDExtendedMasterKeys(): Writing crypted hdmasterkey failed!");
     }
     
     return true;

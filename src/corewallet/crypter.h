@@ -194,8 +194,8 @@ public:
      */
     boost::signals2::signal<void (CCryptoKeyStore* wallet)> NotifyStatusChanged;
 
-    bool EncryptSeed(const CKeyingMaterial& seedIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const;
-    bool DecryptSeed(const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CKeyingMaterial& seedOut) const;
+    bool EncryptExtendedMasterKey(const CExtKey& extKeyIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const;
+    bool DecryptExtendedMasterKey(const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CExtKey& extKeyOut) const;
 };
 }; //end namespace
 #endif // BITCOIN_WALLET_CRYPTER_H

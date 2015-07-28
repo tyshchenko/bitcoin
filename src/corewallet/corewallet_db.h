@@ -26,9 +26,9 @@ public:
     bool LoadWallet(Wallet* pCoreWallet);
     
     bool WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, const CoreWallet::CKeyMetadata &keyMeta);
-    bool WriteHDMasterSeed(const uint256& hash, const CKeyingMaterial& masterSeed);
-    bool WriteHDCryptedMasterSeed(const uint256& hash, const std::vector<unsigned char>& vchCryptedSecret);
-    bool EraseHDMasterSeed(const uint256& hash);
+    bool WriteHDExtendedMasterKey(const uint256& hash, const CExtKey& extKey);
+    bool WriteHDCryptedExtendedMasterKey(const uint256& hash, const std::vector<unsigned char>& vchCryptedSecret);
+    bool EraseHDExtendedMasterKey(const uint256& hash);
     bool WriteHDChain(const CHDChain& chain);
     bool WriteHDPubKey(const CHDPubKey& hdPubKey, const CKeyMetadata& keyMeta);
     bool WriteHDAchiveChain(const uint256& hash);

@@ -12,49 +12,51 @@
 #include <boost/foreach.hpp>
 
 namespace CoreWallet {
-bool CHDKeyStore::AddMasterSeed(const HDChainID& hash, const CKeyingMaterial& masterSeed)
+bool CHDKeyStore::AddExtendedMasterKey(const HDChainID& hash, const CExtKey& extKeyIn)
 {
     LOCK(cs_KeyStore);
     if (IsCrypted())
     {
         std::vector<unsigned char> vchCryptedSecret;
-        if (!EncryptSeed(masterSeed, hash, vchCryptedSecret))
+        if (!CCryptoKeyStore::EncryptExtendedMasterKey(extKeyIn, hash, vchCryptedSecret))
             return false;
 
-        mapHDCryptedMasterSeeds[hash] = vchCryptedSecret;
+        mapHDCryptedExtendedMasterKeys[hash] = vchCryptedSecret;
         return true;
     }
-    mapHDMasterSeeds[hash] = masterSeed;
+    mapHDMasterExtendedMasterKey[hash] = extKeyIn;
     return true;
 }
 
-bool CHDKeyStore::AddCryptedMasterSeed(const HDChainID& hash, const std::vector<unsigned char>& vchCryptedSecret)
+bool CHDKeyStore::AddCryptedExtendedMasterKey(const HDChainID& hash, const std::vector<unsigned char>& vchCryptedSecret)
 {
     LOCK(cs_KeyStore);
-    mapHDCryptedMasterSeeds[hash] = vchCryptedSecret;
+    if (!SetCrypted())
+        return false;
+    mapHDCryptedExtendedMasterKeys[hash] = vchCryptedSecret;
     return true;
 }
 
-bool CHDKeyStore::GetMasterSeed(const HDChainID& hash, CKeyingMaterial& seedOut) const
+bool CHDKeyStore::GetExtendedMasterKey(const HDChainID& hash, CExtKey& extKeyOut) const
 {
     LOCK(cs_KeyStore);
     if (!IsCrypted())
     {
-        std::map<HDChainID, CKeyingMaterial >::const_iterator it=mapHDMasterSeeds.find(hash);
-        if (it == mapHDMasterSeeds.end())
+        std::map<HDChainID, CExtKey >::const_iterator it=mapHDMasterExtendedMasterKey.find(hash);
+        if (it == mapHDMasterExtendedMasterKey.end())
             return false;
 
-        seedOut = it->second;
+        extKeyOut = it->second;
         return true;
     }
     else
     {
-        std::map<HDChainID, std::vector<unsigned char> >::const_iterator it=mapHDCryptedMasterSeeds.find(hash);
-        if (it == mapHDCryptedMasterSeeds.end())
+        std::map<HDChainID, std::vector<unsigned char> >::const_iterator it=mapHDCryptedExtendedMasterKeys.find(hash);
+        if (it == mapHDCryptedExtendedMasterKeys.end())
             return false;
 
         std::vector<unsigned char> vchCryptedSecret = it->second;
-        if (!DecryptSeed(vchCryptedSecret, hash, seedOut))
+        if (!DecryptExtendedMasterKey(vchCryptedSecret, hash, extKeyOut))
             return false;
 
         return true;
@@ -62,28 +64,28 @@ bool CHDKeyStore::GetMasterSeed(const HDChainID& hash, CKeyingMaterial& seedOut)
     return false;
 }
 
-bool CHDKeyStore::EncryptSeeds()
+bool CHDKeyStore::EncryptExtendedMasterKey()
 {
     LOCK(cs_KeyStore);
-    for (std::map<HDChainID, CKeyingMaterial >::iterator it = mapHDMasterSeeds.begin(); it != mapHDMasterSeeds.end(); ++it)
+    for (std::map<HDChainID, CExtKey>::iterator it = mapHDMasterExtendedMasterKey.begin(); it != mapHDMasterExtendedMasterKey.end(); ++it)
     {
         std::vector<unsigned char> vchCryptedSecret;
-        if (!EncryptSeed(it->second, it->first, vchCryptedSecret))
+        if (!CCryptoKeyStore::EncryptExtendedMasterKey(it->second, it->first, vchCryptedSecret))
             return false;
-        AddCryptedMasterSeed(it->first, vchCryptedSecret);
+        AddCryptedExtendedMasterKey(it->first, vchCryptedSecret);
     }
-    mapHDMasterSeeds.clear();
+    mapHDMasterExtendedMasterKey.clear();
     return true;
 }
 
-bool CHDKeyStore::GetCryptedMasterSeed(const HDChainID& hash, std::vector<unsigned char>& vchCryptedSecret) const
+bool CHDKeyStore::GetCryptedExtendedMasterKey(const HDChainID& hash, std::vector<unsigned char>& vchCryptedSecret) const
 {
     LOCK(cs_KeyStore);
     if (!IsCrypted())
         return false;
 
-    std::map<HDChainID, std::vector<unsigned char> >::const_iterator it=mapHDCryptedMasterSeeds.find(hash);
-    if (it == mapHDCryptedMasterSeeds.end())
+    std::map<HDChainID, std::vector<unsigned char> >::const_iterator it=mapHDCryptedExtendedMasterKeys.find(hash);
+    if (it == mapHDCryptedExtendedMasterKeys.end())
         return false;
 
     vchCryptedSecret = it->second;
@@ -128,13 +130,13 @@ bool CHDKeyStore::GetAvailableChainIDs(std::vector<HDChainID>& chainIDs)
 
     if (IsCrypted())
     {
-        for (std::map<HDChainID, std::vector<unsigned char> >::iterator it = mapHDCryptedMasterSeeds.begin(); it != mapHDCryptedMasterSeeds.end(); ++it) {
+        for (std::map<HDChainID, std::vector<unsigned char> >::iterator it = mapHDCryptedExtendedMasterKeys.begin(); it != mapHDCryptedExtendedMasterKeys.end(); ++it) {
             chainIDs.push_back(it->first);
         }
     }
     else
     {
-        for (std::map<HDChainID, CKeyingMaterial >::iterator it = mapHDMasterSeeds.begin(); it != mapHDMasterSeeds.end(); ++it) {
+        for (std::map<HDChainID, CExtKey >::iterator it = mapHDMasterExtendedMasterKey.begin(); it != mapHDMasterExtendedMasterKey.end(); ++it) {
             chainIDs.push_back(it->first);
         }
     }
@@ -195,21 +197,10 @@ bool CHDKeyStore::DeriveKey(const CHDPubKey hdPubKey, CKey& keyOut) const
         if (fragment == "m")
         {
             CExtKey bip32MasterKey;
-            CKeyingMaterial masterSeed;
 
             // get master seed
-            if (!GetMasterSeed(hdPubKey.chainHash, masterSeed))
+            if (!GetExtendedMasterKey(hdPubKey.chainHash, bip32MasterKey))
                 return false;
-
-            if (masterSeed.size() == BIP32_EXTKEY_SIZE)
-            {
-                //if the seed size matches the BIP32_EXTKEY_SIZE, we assume its a encoded ext priv key
-                bip32MasterKey.Decode(&masterSeed[0]);
-            }
-            else
-            {
-                bip32MasterKey.SetMaster(&masterSeed[0], masterSeed.size());
-            }
 
             parentKey = bip32MasterKey;
         }

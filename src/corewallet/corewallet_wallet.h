@@ -94,7 +94,7 @@ public:
     bool HDGetNextChildPubKey(const HDChainID& chainId, CPubKey &pubKeyOut, std::string& newKeysChainpathOut, bool internal = false);
 
     //!encrypt your master seeds
-    bool EncryptHDSeeds(CKeyingMaterial& vMasterKeyIn);
+    bool EncryptHDExtendedMasterKeys(CKeyingMaterial& vMasterKeyIn);
 
     //!set the active chain of keys
     bool HDSetActiveChainID(const HDChainID& chainID, bool check = true);
