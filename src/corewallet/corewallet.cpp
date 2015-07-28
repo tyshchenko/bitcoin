@@ -53,15 +53,23 @@ Manager::Manager()
 
 }
 
-void Manager::LoadWallets()
+bool Manager::LoadWallets(std::string& warningString, std::string& errorString)
 {
     ReadWalletLists();
 
+    bool allWalletsLoaded = true;
     std::pair<std::string, WalletModel> walletAndMetadata;
     LOCK2(cs_main, cs_mapWallets);
     BOOST_FOREACH(walletAndMetadata, mapWallets)
-    if (!mapWallets[walletAndMetadata.first].pWallet)
-        mapWallets[walletAndMetadata.first].pWallet = new Wallet(walletAndMetadata.first);
+    if (!mapWallets[walletAndMetadata.first].pWallet) {
+        Wallet *newWallet = new Wallet(walletAndMetadata.first);
+        if (!newWallet->LoadWallet(warningString, errorString)) {
+            allWalletsLoaded = false;
+        }
+        mapWallets[walletAndMetadata.first].pWallet = newWallet;
+    }
+
+    return allWalletsLoaded;
 }
 
 void Manager::ReadWalletLists()
@@ -90,7 +98,9 @@ void Manager::WriteWalletList()
 
 void LoadAsModule(std::string& warningString, std::string& errorString, bool& stopInit)
 {
-    GetManager()->LoadWallets();
+    if (!GetManager()->LoadWallets(warningString, errorString)) {
+        stopInit = true;
+    }
 }
 
 Wallet* Manager::AddNewWallet(const std::string& walletID)
@@ -105,6 +115,8 @@ Wallet* Manager::AddNewWallet(const std::string& walletID)
             throw std::runtime_error(_("wallet ids can only contain A-Za-z0-9._- chars"));
         
         newWallet = new Wallet(walletID);
+        std::string strError,strWarning;
+        newWallet->LoadWallet(strError, strWarning);
         mapWallets[walletID] = WalletModel(walletID, newWallet);
     }
 

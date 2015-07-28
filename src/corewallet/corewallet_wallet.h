@@ -81,8 +81,18 @@ public:
     //! state: current active hd chain, must be protected over cs_coreWallet
     HDChainID activeHDChain;
 
+    //!encryption stuff
+    typedef std::map<unsigned int, CMasterKey> MasterKeyMap;
+    MasterKeyMap mapMasterKeys;
+    unsigned int nMasterKeyMaxID;
+
+    std::string fileName;
+
     //!wallet constructor, will open wallet and read the database and map everyhing into memory
     Wallet(std::string strWalletFileIn);
+
+    //!Load the wallet and report errors or warning
+    bool LoadWallet(std::string &strError, std::string &strWarnings);
 
     //!adds a hd chain of keys to the wallet
     bool HDAddHDChain(const std::string& chainPath, bool generateMaster, CKeyingMaterial& vSeed, HDChainID& chainId, std::string &strBase58ExtPrivKey, std::string &strBase58ExtPubKey, bool overwrite = false);
@@ -94,7 +104,7 @@ public:
     bool HDGetNextChildPubKey(const HDChainID& chainId, CPubKey &pubKeyOut, std::string& newKeysChainpathOut, bool internal = false);
 
     //!encrypt your master seeds
-    bool EncryptHDExtendedMasterKeys(CKeyingMaterial& vMasterKeyIn);
+    bool EncryptHDExtendedMasterKeys(const CKeyingMaterial& vMasterKeyIn);
 
     //!set the active chain of keys
     bool HDSetActiveChainID(const HDChainID& chainID, bool check = true);
@@ -188,7 +198,11 @@ public:
     CFeeRate GetMinRelayTxFee();
     unsigned int GetMaxStandardTxSize();
 
-
+    /*
+     encryption
+     */
+    bool EncryptWallet(const SecureString& strWalletPassphrase);
+    bool Unlock(const SecureString& strWalletPassphrase);
 
     /*
      mining

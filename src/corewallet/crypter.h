@@ -117,10 +117,10 @@ class CCryptoKeyStore : public CBasicKeyStore
 private:
     CryptedKeyMap mapCryptedKeys;
 
-    CKeyingMaterial vMasterKey;
+    CKeyingMaterial vCrypterKey;
 
     //! if fUseCrypto is true, mapKeys must be empty
-    //! if fUseCrypto is false, vMasterKey must be empty
+    //! if fUseCrypto is false, vCrypterKey must be empty
     bool fUseCrypto;
 
     //! keeps track of whether Unlock has run a thorough check before
@@ -130,9 +130,9 @@ protected:
     bool SetCrypted();
 
     //! will encrypt previously unencrypted keys
-    bool EncryptKeys(CKeyingMaterial& vMasterKeyIn);
+    bool EncryptKeys(CKeyingMaterial& vCrypterKeyIn);
 
-    bool Unlock(const CKeyingMaterial& vMasterKeyIn);
+    bool Unlock(const CKeyingMaterial& vCrypterKeyIn);
 
 public:
     CCryptoKeyStore() : fUseCrypto(false), fDecryptionThoroughlyChecked(false)
@@ -151,7 +151,7 @@ public:
         bool result;
         {
             LOCK(cs_KeyStore);
-            result = vMasterKey.empty();
+            result = vCrypterKey.empty();
         }
         return result;
     }
@@ -194,8 +194,10 @@ public:
      */
     boost::signals2::signal<void (CCryptoKeyStore* wallet)> NotifyStatusChanged;
 
-    bool EncryptExtendedMasterKey(const CExtKey& extKeyIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const;
+    bool EncryptExtendedMasterKey(const CExtKey& keyIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const;
+    bool EncryptExtendedMasterKey(const CKeyingMaterial& vCrypterKeyIn, const CExtKey& extKeyIn, const uint256& seedPubHash, std::vector<unsigned char> &vchCiphertext) const;
     bool DecryptExtendedMasterKey(const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CExtKey& extKeyOut) const;
+    bool DecryptExtendedMasterKey(const CKeyingMaterial& vCrypterKeyIn, const std::vector<unsigned char>& vchCiphertextIn, const uint256& seedPubHash, CExtKey& extKeyOut) const;
 };
 }; //end namespace
 #endif // BITCOIN_WALLET_CRYPTER_H

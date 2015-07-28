@@ -28,6 +28,9 @@
 namespace CoreWallet
 {
 
+int64_t nWalletUnlockTime;
+static CCriticalSection cs_nWalletUnlockTime;
+
 //!rpc help exception
 class RPCHelpException: public std::exception
 {
@@ -102,7 +105,9 @@ UniValue listtransactions(const UniValue& params, bool fHelp);
 UniValue listunspent(const UniValue& params, bool fHelp);
 UniValue createtx(const UniValue& params, bool fHelp);
 UniValue getbalance(const UniValue& params, bool fHelp);
-    
+UniValue encryptwallet(const UniValue& params, bool fHelp);
+UniValue walletunlock(const UniValue& params, bool fHelp);
+
 static const RPCDispatchEntry vDispatchEntries[] = {
     { "listaddresses",                    &listaddresses },
 
@@ -120,7 +125,10 @@ static const RPCDispatchEntry vDispatchEntries[] = {
     // Multiwallet
     { "addwallet",                        &addwallet },
     { "listwallets",                      &listwallets },
-    
+
+    { "encrypt",                          &encryptwallet },
+    { "unlock",                           &walletunlock },
+
     // Help / Debug
     { "help",                             &help },
 };
@@ -128,6 +136,13 @@ static const RPCDispatchEntry vDispatchEntries[] = {
 ///////////////////////////
 // helpers
 ///////////////////////////
+
+//!check if a wallet is encrypted and throws an expection if so
+void EnsureWalletIsUnlocked(Wallet* pWallet)
+{
+    if (pWallet->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+}
 
 //! try to filter out the desired wallet instance via given params
 Wallet* WalletFromParams(const UniValue& params)
@@ -934,6 +949,9 @@ UniValue createtx(const UniValue& params, bool fHelp)
     int nChangePosRet = -1;
     CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
+
+    EnsureWalletIsUnlocked(wallet);
+
     if (!wallet->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError)) {
         if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
@@ -951,6 +969,106 @@ UniValue createtx(const UniValue& params, bool fHelp)
         result.push_back(Pair("txid", wtxNew.GetHash().GetHex()));
 
     return result;
+}
+
+UniValue encryptwallet(const UniValue& params, bool fHelp)
+{
+    static RPCParamEntry allowedParams[] = {
+        { true, "passphrase", VSTR, "he pass phrase to encrypt the wallet with. It must be at least 1 character, but should be long.", "", "my pass phrase"},
+    };
+
+    VerifyParams("encryptwallet", params, fHelp, allowedParams, 1,
+                 "\nEncrypts the wallet with 'passphrase'. This is for first time encryption.\n"
+                 "After this, any calls that interact with private keys such as sending or signing \n"
+                 "will require the passphrase to be set prior the making these calls.\n"
+                 "Use the unlock call for this, and then walletlock call.\n"
+                 "If the wallet is already encrypted, use the walletpassphrasechange call.\n"
+                 "Note that this will shutdown the server.\n"
+                 "%args%"
+                 "\n%examples%");
+
+    Wallet *wallet = WalletFromParams(params);
+    if (wallet->IsCrypted())
+        throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an encrypted wallet, but encryptwallet was called.");
+
+    // TODO: get rid of this .c_str() by implementing SecureString::operator=(std::string)
+    // Alternately, find a way to make params[0] mlock()'d to begin with.
+    SecureString strWalletPass;
+    strWalletPass.reserve(100);
+    UniValue walletPass = ValueFromParams(params, "passphrase", UniValue::VSTR);
+    strWalletPass = walletPass.get_str().c_str();
+
+    if (strWalletPass.length() < 1)
+        throw std::runtime_error(
+                            "encryptwallet <passphrase>\n"
+                            "Encrypts the wallet with <passphrase>.");
+    
+    if (!wallet->EncryptWallet(strWalletPass))
+        throw JSONRPCError(RPC_WALLET_ENCRYPTION_FAILED, "Error: Failed to encrypt the wallet.");
+    
+    return "wallet encrypted;";
+}
+
+static void LockWallet(Wallet* pWallet)
+{
+    LOCK(cs_nWalletUnlockTime);
+    nWalletUnlockTime = 0;
+    pWallet->Lock();
+}
+
+UniValue walletunlock(const UniValue& params, bool fHelp)
+{
+    static RPCParamEntry allowedParams[] = {
+        { true, "passphrase", VSTR, "The wallet passphrase", "", "my pass phrase"},
+        { true, "timeout", VNUM, "The time to keep the decryption key in seconds.", "", "60"},
+    };
+
+    VerifyParams("walletpassphrase", params, fHelp, allowedParams, 2,
+                 "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
+                 "This is needed prior to performing transactions related to private keys such as sending bitcoins\n"
+                 "%args%"
+                 "\nNote:\n"
+                 "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
+                 "time that overrides the old one.\n"
+                 "\n%examples%");
+
+    Wallet *wallet = WalletFromParams(params);
+
+    if (!wallet->IsCrypted())
+        throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletpassphrase was called.");
+
+    // Note that the walletpassphrase is stored in params[0] which is not mlock()ed
+    SecureString strWalletPass;
+    strWalletPass.reserve(100);
+    UniValue walletPass = ValueFromParams(params, "passphrase", UniValue::VSTR);
+    UniValue timeoutVal = ValueFromParams(params, "timeout", UniValue::VNUM);
+    // TODO: get rid of this .c_str() by implementing SecureString::operator=(std::string)
+    // Alternately, find a way to make params[0] mlock()'d to begin with.
+    strWalletPass = walletPass.get_str().c_str();
+
+    if (strWalletPass.length() > 0)
+    {
+        if (!wallet->Unlock(strWalletPass))
+            throw JSONRPCError(RPC_WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");
+    }
+    else {
+        throw std::runtime_error(
+                            "walletpassphrase <passphrase> <timeout>\n"
+                            "Stores the wallet decryption key in memory for <timeout> seconds.");
+    }
+    
+    //wallet->TopUpKeyPool();
+
+    int64_t nSleepTime = 100;
+    if (timeoutVal.isNum())
+    {
+        nSleepTime = timeoutVal.get_int64();
+    }
+    LOCK(cs_nWalletUnlockTime);
+    nWalletUnlockTime = GetTime() + nSleepTime;
+    RPCRunLater("lockwallet", boost::bind(LockWallet, wallet), nSleepTime);
+    
+    return NullUniValue;
 }
     
 ///////////////////////////

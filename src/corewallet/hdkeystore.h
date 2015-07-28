@@ -127,7 +127,7 @@ public:
     virtual bool AddCryptedExtendedMasterKey(const HDChainID& hash, const std::vector<unsigned char>& vchCryptedSecret);
 
     //!encrypt existing uncrypted extended master private key and remove unencrypted data
-    virtual bool EncryptExtendedMasterKey();
+    virtual bool EncryptExtendedMasterKey(const CKeyingMaterial& vMasterKeyIn);
 
     //!export the extended master private key from a given chain id (hash of the master pub key)
     virtual bool GetExtendedMasterKey(const HDChainID& hash, CExtKey& extKeyOut) const;
@@ -169,6 +169,8 @@ public:
 
     //!get a hdpubkey
     bool GetHDPubKey(const CKeyID &address, CHDPubKey &pubkeyOut) const;
+
+    bool Unlock(const CKeyingMaterial& vMasterKeyIn);
 };
 };  //end namespace
 #endif // BITCOIN_WALLET_HDKEYSTORE_H

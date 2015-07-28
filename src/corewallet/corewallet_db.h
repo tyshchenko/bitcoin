@@ -35,6 +35,8 @@ public:
 
     bool WriteTx(uint256 hash, const WalletTx& wtx);
     bool EraseTx(uint256 hash);
+
+    bool WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey);
 };
     
 }; // end namespace CoreWallet

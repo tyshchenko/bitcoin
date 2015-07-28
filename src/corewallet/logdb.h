@@ -149,7 +149,8 @@ public:
     // only reads committed data, no local modifications
     const_iterator begin() const { return db->mapData.begin(); }
     const_iterator end() const   { return db->mapData.end(); }
-    
+    unsigned int size() const { return db->mapData.size(); }
+
 template<typename K, typename V>
 bool Write(const K &key, const V &value, bool fOverwrite = true)
 {

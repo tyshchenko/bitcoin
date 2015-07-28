@@ -32,7 +32,7 @@ bool FileDB::WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, cons
 
 bool FileDB::WriteHDExtendedMasterKey(const uint256& hash, const CExtKey& extKey)
 {
-    return Write(std::make_pair(kvs_hd_master_seed_key, hash), extKey);
+    return Write(std::make_pair(kvs_hd_ext_master_privkey_key, hash), extKey);
 }
 
 bool FileDB::WriteHDCryptedExtendedMasterKey(const uint256& hash, const std::vector<unsigned char>& vchCryptedSecret)
@@ -40,15 +40,15 @@ bool FileDB::WriteHDCryptedExtendedMasterKey(const uint256& hash, const std::vec
     if (!Write(std::make_pair(kvs_hd_encrypted_master_seed_key, hash), vchCryptedSecret))
         return false;
 
-    Erase(std::make_pair(kvs_hd_master_seed_key, hash));
-    Erase(std::make_pair(kvs_hd_master_seed_key, hash));
+    Erase(std::make_pair(kvs_hd_ext_master_privkey_key, hash));
+    Erase(std::make_pair(kvs_hd_ext_master_privkey_key, hash));
 
     return true;
 }
 
 bool FileDB::EraseHDExtendedMasterKey(const uint256& hash)
 {
-    return Erase(std::make_pair(kvs_hd_master_seed_key, hash));
+    return Erase(std::make_pair(kvs_hd_ext_master_privkey_key, hash));
 }
 
 bool FileDB::WriteHDChain(const CHDChain &chain)
@@ -78,6 +78,11 @@ bool FileDB::WriteTx(uint256 hash, const WalletTx& wtx)
 bool FileDB::EraseTx(uint256 hash)
 {
     return Erase(std::make_pair(kvs_wtx_key, hash));
+}
+
+bool FileDB::WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey)
+{
+    return Write(std::make_pair(std::string(kvs_encryption_key), nID), kMasterKey);
 }
 
 bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue, std::string& strType, std::string& strErr)
@@ -152,7 +157,7 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             ssValue >> metadata;
             pCoreWallet->mapAddressBook[CBitcoinAddress(strAddress).Get()] = metadata;
         }
-        else if (strType == kvs_hd_master_seed_key)
+        else if (strType == kvs_hd_ext_master_privkey_key)
         {
             uint256 masterPubKeyHash;
             CExtKey extKey;
@@ -221,6 +226,21 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
                 pCoreWallet->nHighestOrderPos = wtx.nOrderPos;
 
             pCoreWallet->AddToWallet(wtx, NULL, NULL, true);
+        }
+        else if (strType == kvs_encryption_key)
+        {
+            unsigned int nID;
+            ssKey >> nID;
+            CMasterKey kMasterKey;
+            ssValue >> kMasterKey;
+            if(pCoreWallet->mapMasterKeys.count(nID) != 0)
+            {
+                strErr = strprintf("Error reading wallet database: duplicate CMasterKey id %u", nID);
+                return false;
+            }
+            pCoreWallet->mapMasterKeys[nID] = kMasterKey;
+            if (pCoreWallet->nMasterKeyMaxID < nID)
+                pCoreWallet->nMasterKeyMaxID = nID;
         }
     } catch (...)
     {

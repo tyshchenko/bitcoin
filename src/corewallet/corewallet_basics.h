@@ -21,13 +21,14 @@ namespace CoreWallet
     //keyvalue store (database/logdb) keys
     static const std::string kvs_keymetadata_key                = "keymeta";
     static const std::string kvs_key_key                        = "key";
-    static const std::string kvs_hd_master_seed_key             = "hdmasterseed";
+    static const std::string kvs_hd_ext_master_privkey_key      = "hdmasterseed";
     static const std::string kvs_hd_hdchain_key                 = "hdchain"; //chain of keys metadata like m/44'/0'... (CHDChain)
     static const std::string kvs_hd_encrypted_master_seed_key   = "hdcryptedmasterseed";
     static const std::string kvs_hdpubkey_key                   = "hdpubkey"; //a pubkey with some hd metadata (CHDPubKey)
     static const std::string kvs_hdactivechain_key              = "hdactivechain"; //the current active hd chain of keys (uint256)
     static const std::string kvs_wtx_key                        = "tx";
     static const std::string kvs_address_book_metadata_key      = "adrmeta";
+    static const std::string kvs_encryption_key                 = "enckey";
 
 
     enum CREDIT_DEBIT_TYPE

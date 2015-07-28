@@ -64,13 +64,13 @@ bool CHDKeyStore::GetExtendedMasterKey(const HDChainID& hash, CExtKey& extKeyOut
     return false;
 }
 
-bool CHDKeyStore::EncryptExtendedMasterKey()
+bool CHDKeyStore::EncryptExtendedMasterKey(const CKeyingMaterial& vCrypterKeyIn)
 {
     LOCK(cs_KeyStore);
     for (std::map<HDChainID, CExtKey>::iterator it = mapHDMasterExtendedMasterKey.begin(); it != mapHDMasterExtendedMasterKey.end(); ++it)
     {
         std::vector<unsigned char> vchCryptedSecret;
-        if (!CCryptoKeyStore::EncryptExtendedMasterKey(it->second, it->first, vchCryptedSecret))
+        if (!CCryptoKeyStore::EncryptExtendedMasterKey(vCrypterKeyIn, it->second, it->first, vchCryptedSecret))
             return false;
         AddCryptedExtendedMasterKey(it->first, vchCryptedSecret);
     }
@@ -285,6 +285,27 @@ bool CHDKeyStore::GetChain(const HDChainID chainId, CHDChain& chainOut) const
         return false;
 
     chainOut = it->second;
+    return true;
+}
+bool CHDKeyStore::Unlock(const CKeyingMaterial& vCrypterKeyIn)
+{
+    LOCK(cs_KeyStore);
+    if (!SetCrypted())
+        return false;
+
+    //TODO, error check
+    std::map<HDChainID, std::vector<unsigned char> >::iterator mi = mapHDCryptedExtendedMasterKeys.begin();
+    for (; mi != mapHDCryptedExtendedMasterKeys.end(); ++mi)
+    {
+        HDChainID chainId = (*mi).first;
+        const std::vector<unsigned char> &vchCryptedSecret = (*mi).second;
+        CExtKey key;
+        if (!DecryptExtendedMasterKey(vCrypterKeyIn, vchCryptedSecret, chainId, key))
+        {
+            break;
+        }
+    }
+    CCryptoKeyStore::Unlock(vCrypterKeyIn);
     return true;
 }
 }; //end namespace

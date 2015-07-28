@@ -17,7 +17,7 @@ namespace CoreWallet {
         Manager();
         virtual ~Manager() {}
 
-        void LoadWallets();
+        bool LoadWallets(std::string& warningString, std::string& errorString);
 
         //!will return a wallet with given walletid, "" (empty string) will return the default wallet (if exists)
         Wallet* GetWalletWithID(const std::string& walletIDIn);

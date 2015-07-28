@@ -36,18 +36,25 @@ CFeeRate Wallet::minTxFee = CFeeRate(1000);
 
 Wallet::Wallet(std::string strWalletFileIn)
 {
+    fileName = strWalletFileIn;
     bestChainTip = CoreInterface::GetActiveChainTip();
-
-    //instantiate a wallet backend object and maps the stored values
-    walletPrivateDB = new FileDB(strWalletFileIn+".private.logdb");
-    walletPrivateDB->LoadWallet(this);
-
-    walletCacheDB = new FileDB(strWalletFileIn+".cache.logdb");
-    walletCacheDB->LoadWallet(this);
+    coreInterface = CoreInterface();//TODO: <-- remove, make static
 
     this->SetBroadcastTransactions(GetBoolArg("-walletbroadcast", true));
+}
 
-    coreInterface = CoreInterface();
+bool Wallet::LoadWallet(std::string &strError, std::string &strWarnings)
+{
+    walletPrivateDB = new FileDB(fileName+".private.logdb");
+    if (!walletPrivateDB->LoadWallet(this))
+    {
+        strError += "Error loading wallet file ("+fileName+")" + "\n";
+        return false;
+    }
+
+    walletCacheDB = new FileDB(fileName+".cache.logdb");
+    walletCacheDB->LoadWallet(this);
+    return true;
 }
 
 bool Wallet::InMemAddKey(const CKey& key, const CPubKey &pubkey)
@@ -87,6 +94,119 @@ bool Wallet::SetAndStoreAddressBook(const CTxDestination& address, const std::st
 }
 
 
+bool Wallet::EncryptWallet(const SecureString& strWalletPassphrase)
+{
+    if (IsCrypted())
+        return false;
+
+    CKeyingMaterial vMasterKey;
+    RandAddSeedPerfmon();
+
+    vMasterKey.resize(WALLET_CRYPTO_KEY_SIZE);
+    GetRandBytes(&vMasterKey[0], WALLET_CRYPTO_KEY_SIZE);
+
+    CMasterKey kMasterKey;
+    RandAddSeedPerfmon();
+
+    kMasterKey.vchSalt.resize(WALLET_CRYPTO_SALT_SIZE);
+    GetRandBytes(&kMasterKey.vchSalt[0], WALLET_CRYPTO_SALT_SIZE);
+
+    CCrypter crypter;
+    int64_t nStartTime = GetTimeMillis();
+    crypter.SetKeyFromPassphrase(strWalletPassphrase, kMasterKey.vchSalt, 25000, kMasterKey.nDerivationMethod);
+    kMasterKey.nDeriveIterations = 2500000 / ((double)(GetTimeMillis() - nStartTime));
+
+    nStartTime = GetTimeMillis();
+    crypter.SetKeyFromPassphrase(strWalletPassphrase, kMasterKey.vchSalt, kMasterKey.nDeriveIterations, kMasterKey.nDerivationMethod);
+    kMasterKey.nDeriveIterations = (kMasterKey.nDeriveIterations + kMasterKey.nDeriveIterations * 100 / ((double)(GetTimeMillis() - nStartTime))) / 2;
+
+    if (kMasterKey.nDeriveIterations < 25000)
+        kMasterKey.nDeriveIterations = 25000;
+
+    LogPrintf("Encrypting Wallet with an nDeriveIterations of %i\n", kMasterKey.nDeriveIterations);
+
+    if (!crypter.SetKeyFromPassphrase(strWalletPassphrase, kMasterKey.vchSalt, kMasterKey.nDeriveIterations, kMasterKey.nDerivationMethod))
+        return false;
+    if (!crypter.Encrypt(vMasterKey, kMasterKey.vchCryptedKey))
+        return false;
+
+    {
+        LOCK(cs_coreWallet);
+        mapMasterKeys[++nMasterKeyMaxID] = kMasterKey;
+
+        if (!walletPrivateDB->TxnBegin()) {
+            return false;
+        }
+        walletPrivateDB->WriteMasterKey(nMasterKeyMaxID, kMasterKey);
+
+        if (!EncryptKeys(vMasterKey) || !EncryptHDExtendedMasterKeys(vMasterKey))
+        {
+            walletPrivateDB->TxnAbort();
+
+            // We now probably have half of our keys encrypted in memory, and half not...
+            // die and let the user reload the unencrypted wallet.
+            assert(false);
+        }
+
+        if (!walletPrivateDB->TxnCommit()) {
+            assert(false);
+        }
+        
+        Lock();
+        Unlock(strWalletPassphrase);
+        //NewKeyPool();
+        Lock();
+        
+        // Need to completely rewrite the wallet file; mind, we
+        // are using a append only filestore and don't want to
+        // keep unencrypted sensitive data in the walletfile
+        unsigned int recSize = walletPrivateDB->size();
+
+        walletPrivateDB->Rewrite((GetDataDir() / fileName).string()+".private.logdb.compact");
+        walletPrivateDB->Close();
+        delete walletPrivateDB;
+
+        mapMasterKeys.clear();
+        //check if file is valid
+        FileDB *testDB = new FileDB(fileName+".private.logdb.compact");
+        if (!testDB->LoadWallet(this)) {
+            throw std::runtime_error("Error. Could not load compact written wallet.\n");
+        }
+        assert(testDB->size() == recSize);
+        delete testDB;
+        mapMasterKeys.clear();
+        
+        //most atomic replacement of compact file
+        boost::filesystem::remove(GetDataDir() / (fileName + ".private.logdb"));
+        boost::filesystem::rename(GetDataDir() / (fileName + ".private.logdb.compact"), GetDataDir() / (fileName + ".private.logdb"));
+
+        //reopen file
+        walletPrivateDB = new FileDB(fileName+".private.logdb");
+        walletPrivateDB->LoadWallet(this);
+    }
+    NotifyStatusChanged(this);
+
+    return true;
+}
+
+bool Wallet::Unlock(const SecureString& strWalletPassphrase)
+{
+    CCrypter crypter;
+    CKeyingMaterial vMasterKey;
+    {
+        LOCK(cs_coreWallet);
+        BOOST_FOREACH(const MasterKeyMap::value_type& pMasterKey, mapMasterKeys)
+        {
+            if(!crypter.SetKeyFromPassphrase(strWalletPassphrase, pMasterKey.second.vchSalt, pMasterKey.second.nDeriveIterations, pMasterKey.second.nDerivationMethod))
+                return false;
+            if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, vMasterKey))
+                continue; // try another master key
+            if (CHDKeyStore::Unlock(vMasterKey))
+                return true;
+        }
+    }
+    return false;
+}
 
 const unsigned int HD_MAX_DEPTH = 20;
 
@@ -297,9 +417,9 @@ bool Wallet::HDGetNextChildPubKey(const HDChainID& chainIDIn, CPubKey &pubKeyOut
     return true;
 }
 
-bool Wallet::EncryptHDExtendedMasterKeys(CKeyingMaterial& vMasterKeyIn)
+bool Wallet::EncryptHDExtendedMasterKeys(const CKeyingMaterial& vMasterKeyIn)
 {
-    EncryptExtendedMasterKey(); //in hdkeystore
+    EncryptExtendedMasterKey(vMasterKeyIn); //in hdkeystore
 
     std::vector<HDChainID> chainIds;
     GetAvailableChainIDs(chainIds);
