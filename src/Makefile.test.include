@@ -87,7 +87,8 @@ endif
 
 if ENABLE_COREWALLET
 BITCOIN_TESTS += \
-  corewallet/test/logdb_tests.cpp
+  corewallet/test/logdb_tests.cpp \
+  corewallet/test/corewallet_tests.cpp
 endif
 
 test_test_bitcoin_SOURCES = $(BITCOIN_TESTS) $(JSON_TEST_FILES) $(RAW_TEST_FILES)
