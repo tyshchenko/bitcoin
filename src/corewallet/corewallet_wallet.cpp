@@ -1423,6 +1423,15 @@ bool Wallet::IsMine(const CTransaction& tx) const
     return false;
 }
 
+bool Wallet::IsFromMe(const WalletTx& tx, const isminefilter& filter) const
+{
+    CAmount amount;
+    if (tx.GetCache(CREDIT_DEBIT_TYPE_DEBIT, filter, amount))
+        return (amount > 0);
+
+    return (GetDebit(tx, filter) > 0);
+}
+
 bool Wallet::IsFromMe(const CTransaction& tx, const isminefilter& filter) const
 {
     return (GetDebit(tx, filter) > 0);

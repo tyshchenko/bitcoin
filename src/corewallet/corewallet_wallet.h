@@ -139,6 +139,7 @@ public:
     isminetype IsMine(const CTxIn& txin) const;
     isminetype IsMine(const CTxOut& txout) const;
     bool IsMine(const CTransaction& tx) const;
+    bool IsFromMe(const WalletTx& tx, const isminefilter& filter) const;
     bool IsFromMe(const CTransaction& tx, const isminefilter& filter = ISMINE_ALL) const;
 
 
