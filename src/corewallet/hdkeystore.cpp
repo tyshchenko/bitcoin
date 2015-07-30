@@ -287,6 +287,7 @@ bool CHDKeyStore::GetChain(const HDChainID chainId, CHDChain& chainOut) const
     chainOut = it->second;
     return true;
 }
+
 bool CHDKeyStore::Unlock(const CKeyingMaterial& vCrypterKeyIn)
 {
     LOCK(cs_KeyStore);
