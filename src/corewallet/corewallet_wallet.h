@@ -73,6 +73,7 @@ public:
     int64_t nTimeFirstKey; //!oldest key timestamp
     int64_t nHighestOrderPos; //!highest order pos cache
     CBlockIndex bestChainTip; //!MEM ONLY: chainTip of bestchain
+    CBlockLocator lastKnowBestBlock;
 
     //wallet backends
     FileDB *walletPrivateDB;
@@ -122,7 +123,7 @@ public:
 
     //! inform wallet about a new arrived transaction
     void SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, const CBlock* pblock);
-    
+    void SetBestChain(const CBlockLocator& loc);
     /*
      receiving stack
      */

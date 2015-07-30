@@ -36,6 +36,8 @@ public:
     bool WriteTx(uint256 hash, const WalletTx& wtx);
     bool EraseTx(uint256 hash);
 
+    bool WriteBestBlock(const CBlockLocator& locator);
+
     bool WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey);
 };
     

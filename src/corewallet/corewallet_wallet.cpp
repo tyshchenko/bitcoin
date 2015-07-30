@@ -43,6 +43,12 @@ Wallet::Wallet(std::string strWalletFileIn)
     this->SetBroadcastTransactions(GetBoolArg("-walletbroadcast", true));
 }
 
+void Wallet::SetBestChain(const CBlockLocator& loc)
+{
+    LOCK(cs_coreWallet);
+    walletCacheDB->WriteBestBlock(loc);
+}
+
 bool Wallet::LoadWallet(std::string &strError, std::string &strWarnings)
 {
     walletPrivateDB = new FileDB(fileName+".private.logdb");

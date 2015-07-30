@@ -55,10 +55,13 @@ Manager::Manager()
 
 bool Manager::LoadWallets(std::string& warningString, std::string& errorString)
 {
+    int64_t nStart = GetTimeMillis();
     ReadWalletLists();
 
     bool allWalletsLoaded = true;
     std::pair<std::string, WalletModel> walletAndMetadata;
+    std::vector<CBlockLocator> walletsBestBlocks;
+
     LOCK2(cs_main, cs_mapWallets);
     BOOST_FOREACH(walletAndMetadata, mapWallets)
     if (!mapWallets[walletAndMetadata.first].pWallet) {
@@ -66,7 +69,64 @@ bool Manager::LoadWallets(std::string& warningString, std::string& errorString)
         if (!newWallet->LoadWallet(warningString, errorString)) {
             allWalletsLoaded = false;
         }
+        else
+        {
+            walletsBestBlocks.push_back(newWallet->lastKnowBestBlock);
+        }
         mapWallets[walletAndMetadata.first].pWallet = newWallet;
+    }
+
+    CBlockIndex *pindexRescan = chainActive.Tip();
+    if (GetBoolArg("-rescan", false)) {
+        pindexRescan = chainActive.Genesis();
+    }
+    else
+    {
+        // search the blockindex with lowest height including a check
+        // if blocklocator is in chainActive
+        pindexRescan = chainActive.Genesis();
+        CBlockIndex *pTempBlockIndex;
+        BOOST_FOREACH(CBlockLocator locator, walletsBestBlocks)
+        {
+            if (locator.IsNull())
+                break;
+
+            pTempBlockIndex = FindForkInGlobalIndex(chainActive, locator);
+            if (pTempBlockIndex->nHeight < pindexRescan->nHeight && pTempBlockIndex != chainActive.Genesis())
+                pindexRescan = pTempBlockIndex;
+        }
+    }
+    if (chainActive.Tip() && chainActive.Tip() != pindexRescan)
+    {
+        //We can't rescan beyond non-pruned blocks, stop and throw an error
+        //this might happen if a user uses a old wallet within a pruned node
+        // or if he ran -disablewallet for a longer time, then decided to re-enable
+        if (fPruneMode)
+        {
+            CBlockIndex *block = chainActive.Tip();
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA) && block->pprev->nTx > 0 && pindexRescan != block)
+                block = block->pprev;
+
+            if (pindexRescan != block)
+            {
+                errorString += _("Prune: last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of pruned node)") + "\n";
+                return true;
+            }
+        }
+
+        uiInterface.InitMessage(_("Rescanning..."));
+        LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight, pindexRescan->nHeight);
+        nStart = GetTimeMillis();
+        this->RequestWalletRescan(pindexRescan, true);
+        LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
+
+        BOOST_FOREACH(walletAndMetadata, mapWallets)
+        {
+            Wallet *pWallet = mapWallets[walletAndMetadata.first].pWallet;
+            if (pWallet) {
+                pWallet->SetBestChain(chainActive.GetLocator());
+            }
+        }
     }
 
     return allWalletsLoaded;
@@ -190,6 +250,55 @@ void Manager::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex,
             if (pWallet)
                 pWallet->SyncTransaction(tx, pindex, pblock);
         }
+    }
+}
+
+void Manager::RequestWalletRescan(CBlockIndex* pindexStart, bool fUpdate)
+{
+    int64_t nNow = GetTime();
+
+    //TODO: do not always scan from the genesis block
+    //keep track of the oldest key from all available wallets
+    int64_t nTimeFirstKey = 0;
+
+    const CChainParams& chainParams = Params();
+
+    CBlockIndex* pindex = pindexStart;
+    {
+        LOCK2(cs_main, cs_mapWallets);
+
+        // no need to read and scan block, if block was created before
+        // our wallet birthday (as adjusted for block time variability)
+        while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
+            pindex = chainActive.Next(pindex);
+
+        uiInterface.ShowProgress(_("Rescanning..."), 0); // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
+        double dProgressStart = Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false);
+        double dProgressTip = Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip(), false);
+        while (pindex)
+        {
+            if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0)
+                uiInterface.ShowProgress(_("Rescanning..."), std::max(1, std::min(99, (int)((Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false) - dProgressStart) / (dProgressTip - dProgressStart) * 100))));
+
+            CBlock block;
+            ReadBlockFromDisk(block, pindex);
+            BOOST_FOREACH(CTransaction& tx, block.vtx)
+            {
+                std::pair<std::string, WalletModel> walletAndMetadata;
+                BOOST_FOREACH(walletAndMetadata, mapWallets)
+                {
+                    Wallet *pWallet = mapWallets[walletAndMetadata.first].pWallet;
+                    if (pWallet)
+                        pWallet->SyncTransaction(tx, pindex, &block);
+                }
+            }
+            pindex = chainActive.Next(pindex);
+            if (GetTime() >= nNow + 60) {
+                nNow = GetTime();
+                LogPrintf("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight, Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
+            }
+        }
+        uiInterface.ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
     }
 }
 

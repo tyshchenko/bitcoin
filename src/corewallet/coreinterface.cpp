@@ -94,7 +94,10 @@ bool CoreInterface::IsInBestChain(uint256 blockhash)
 
 CBlockIndex CoreInterface::GetActiveChainTip()
 {
-    return *chainActive.Tip();
+    if (chainActive.Tip())
+        return *chainActive.Tip();
+
+    return CBlockIndex();
 }
 
 } // end namespace

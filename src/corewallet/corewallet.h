@@ -34,6 +34,8 @@ namespace CoreWallet {
         //CValidationInterface listener, will ask all wallets to sync a given transaction
         void ExecuteRPCI(const std::string& strMethod, const UniValue& params, UniValue& result, bool& accept);
 
+        void RequestWalletRescan(CBlockIndex* pindexStart, bool fUpdate);
+        
     protected:
         CCriticalSection cs_mapWallets;
         std::map<std::string, WalletModel> mapWallets; //!map with wallet metadata

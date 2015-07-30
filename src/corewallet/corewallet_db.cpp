@@ -85,6 +85,11 @@ bool FileDB::WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey)
     return Write(std::make_pair(std::string(kvs_encryption_key), nID), kMasterKey);
 }
 
+bool FileDB::WriteBestBlock(const CBlockLocator& locator)
+{
+    return Write(std::string(kvs_bestblock_key), locator);
+}
+
 bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue, std::string& strType, std::string& strErr)
 {
     try {
@@ -242,6 +247,11 @@ bool ReadKeyValue(Wallet* pCoreWallet, CDataStream& ssKey, CDataStream& ssValue,
             if (pCoreWallet->nMasterKeyMaxID < nID)
                 pCoreWallet->nMasterKeyMaxID = nID;
         }
+        else if (strType == kvs_bestblock_key)
+        {
+            ssValue >> pCoreWallet->lastKnowBestBlock;
+        }
+
     } catch (...)
     {
         return false;

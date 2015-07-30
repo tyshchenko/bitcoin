@@ -29,6 +29,7 @@ namespace CoreWallet
     static const std::string kvs_wtx_key                        = "tx";
     static const std::string kvs_address_book_metadata_key      = "adrmeta";
     static const std::string kvs_encryption_key                 = "enckey";
+    static const std::string kvs_bestblock_key                  = "bestblock";
 
 
     enum CREDIT_DEBIT_TYPE
