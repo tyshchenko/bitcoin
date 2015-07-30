@@ -107,15 +107,22 @@ class AuthServiceProxy(object):
         return AuthServiceProxy(self.__service_url, name, connection=self.__conn)
 
     def __call__(self, *args):
+        urlAdd = ""
+        method = self.__service_name
+        elements = self.__service_name.split(".")
+        if len(elements) > 1:
+            urlAdd = "/"+elements[0]
+            method = elements[1]
+            
         AuthServiceProxy.__id_count += 1
 
-        log.debug("-%s-> %s %s"%(AuthServiceProxy.__id_count, self.__service_name,
+        log.debug("-%s-> %s/%s %s"%(AuthServiceProxy.__id_count, urlAdd, method,
                                  json.dumps(args, default=EncodeDecimal)))
         postdata = json.dumps({'version': '1.1',
-                               'method': self.__service_name,
+                               'method': method,
                                'params': args,
                                'id': AuthServiceProxy.__id_count}, default=EncodeDecimal)
-        self.__conn.request('POST', self.__url.path, postdata,
+        self.__conn.request('POST', self.__url.path+urlAdd, postdata,
                             {'Host': self.__url.hostname,
                              'User-Agent': USER_AGENT,
                              'Authorization': self.__auth_header,
