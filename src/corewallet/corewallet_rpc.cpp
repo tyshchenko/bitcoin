@@ -235,6 +235,9 @@ void VerifyParams(const std::string &callname, const UniValue& params, bool forc
         const UniValue& o = params[0].get_obj();
         BOOST_FOREACH(const std::string &key, o.getKeys())
         {
+            if (boost::to_lower_copy(key) == "walletid")
+                continue;
+            
             bool found = false;
             unsigned int i;
             for (i = 0; i < aPsize; i++)
