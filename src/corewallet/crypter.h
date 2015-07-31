@@ -6,7 +6,6 @@
 #define BITCOIN_WALLET_CRYPTER_H
 
 #include "keystore.h"
-#include "corewallet/derivingkeystore.h"
 #include "serialize.h"
 #include "support/allocators/secure.h"
 
