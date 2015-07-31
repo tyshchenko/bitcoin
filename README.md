@@ -1,9 +1,15 @@
-Bitcoin Core integration/staging tree
+Bitcoin Core / CoreWallet integration/staging tree
 =====================================
 
-[![Build Status](https://travis-ci.org/bitcoin/bitcoin.svg?branch=master)](https://travis-ci.org/bitcoin/bitcoin)
+[![Build Status](https://travis-ci.org/jonasschnelli/bitcoin.svg?branch=2015/05/corewallet)](https://travis-ci.org/jonasschnelli/bitcoin)
 
 https://www.bitcoin.org
+
+What is CoreWallet?
+-------------------
+CoreWallet is a (currently experimantal) wallet implementation for bitcoin-core.
+Main goal of CoreWallet is to create a couterweight against the current wallet development direction in the bitcoin space (SPV with hight BF FP rates or centralized webbased solutions).
+Corewallet aims to be a feature rich and flexible wallet for users seeking a maximum of security and privacy.
 
 What is Bitcoin?
 ----------------
