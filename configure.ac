@@ -77,9 +77,9 @@ AC_ARG_ENABLE([wallet],
 # Enable corewallet
 AC_ARG_ENABLE([corewallet],
   [AS_HELP_STRING([--enable-corewallet],
-  [enable corewallet (default is no)])],
+  [enable corewallet (default is yes)])],
   [enable_corewallet=$enableval],
-  [enable_corewallet=no])
+  [enable_corewallet=yes])
 
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
