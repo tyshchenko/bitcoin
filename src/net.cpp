@@ -613,7 +613,9 @@ void CNode::copyStats(CNodeStats &stats)
     X(fInbound);
     X(nStartingHeight);
     X(nSendBytes);
+    X(mapSendBytesPerCmd);
     X(nRecvBytes);
+    X(mapRecvBytesPerCmd);
     X(fWhitelisted);
 
     // It is common for nodes with good ping times to suddenly become lagged,
@@ -667,6 +669,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         nBytes -= handled;
 
         if (msg.complete()) {
+            mapRecvBytesPerCmd[std::string(msg.hdr.pchCommand)] += msg.hdr.nMessageSize;
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }
@@ -2171,7 +2174,7 @@ void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
     LogPrint("net", "(aborted)\n");
 }
 
-void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
+void CNode::EndMessage(const char* pszCommand) UNLOCK_FUNCTION(cs_vSend)
 {
     // The -*messagestest options are intentionally not documented in the help message,
     // since they are only used during development to debug the networking code and are
@@ -2193,6 +2196,9 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     // Set the size
     unsigned int nSize = ssSend.size() - CMessageHeader::HEADER_SIZE;
     WriteLE32((uint8_t*)&ssSend[CMessageHeader::MESSAGE_SIZE_OFFSET], nSize);
+
+    //log total amount of bytes per command
+    mapSendBytesPerCmd[std::string(pszCommand)] += nSize;
 
     // Set the checksum
     uint256 hash = Hash(ssSend.begin() + CMessageHeader::HEADER_SIZE, ssSend.end());
