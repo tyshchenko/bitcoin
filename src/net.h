@@ -322,12 +322,10 @@ public:
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
-    mapCmdSize_t mapSendBytesPerCmd;
 
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CCriticalSection cs_vRecvMsg;
-    mapCmdSize_t mapRecvBytesPerCmd;
     uint64_t nRecvBytes;
     int nRecvVersion;
 
@@ -373,6 +371,9 @@ protected:
     // whitelisted (as well as those connecting to whitelisted binds).
     static std::vector<CSubNet> vWhitelistedRange;
     static CCriticalSection cs_vWhitelistedRange;
+
+    mapCmdSize_t mapSendBytesPerCmd;
+    mapCmdSize_t mapRecvBytesPerCmd;
 
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
