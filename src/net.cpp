@@ -638,6 +638,13 @@ void CNode::copyStats(CNodeStats &stats)
 }
 #undef X
 
+//immutable thread safe array of allowed commands for logging inbound traffic
+const static std::string logAllowIncommingCmds[] = {
+    "version", "verack", "addr", "inv", "getdata",
+    "getblocks", "getheaders", "tx", "headers", "block",
+    "getaddr", "mempool", "ping", "pong", "alert",
+    "filterload", "filteradd", "filterclear", "reject"};
+
 // requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
@@ -669,7 +676,19 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         nBytes -= handled;
 
         if (msg.complete()) {
-            mapRecvBytesPerCmd[std::string(msg.hdr.pchCommand)] += msg.hdr.nMessageSize;
+
+            //store received bytes per command
+            //to prevent a memory DOS, only allow valid commands
+            std::string command(msg.hdr.pchCommand);
+            for (unsigned int i = 0; i < sizeof(logAllowIncommingCmds)/sizeof(logAllowIncommingCmds[0]); i++)
+            {
+                if (logAllowIncommingCmds[i] == command)
+                {
+                    mapRecvBytesPerCmd[command] += msg.hdr.nMessageSize;
+                    break;
+                }
+            }
+
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }
