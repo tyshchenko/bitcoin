@@ -280,6 +280,8 @@ void WalletView::usedSendingAddresses()
         return;
 
     usedSendingAddressesPage->show();
+    usedSendingAddressesPage->raise();
+    usedSendingAddressesPage->activateWindow();
 }
 
 void WalletView::usedReceivingAddresses()
@@ -288,6 +290,8 @@ void WalletView::usedReceivingAddresses()
         return;
 
     usedReceivingAddressesPage->show();
+    usedReceivingAddressesPage->raise();
+    usedReceivingAddressesPage->activateWindow();
 }
 
 void WalletView::showProgress(const QString &title, int nProgress)
