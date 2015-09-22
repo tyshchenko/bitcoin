@@ -376,7 +376,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
 
 UniValue getnettotals(const UniValue& params, bool fHelp)
 {
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
         throw runtime_error(
             "getnettotals\n"
             "\nReturns information about network traffic, including bytes in, bytes out,\n"
@@ -396,6 +396,64 @@ UniValue getnettotals(const UniValue& params, bool fHelp)
     obj.push_back(Pair("totalbytesrecv", CNode::GetTotalBytesRecv()));
     obj.push_back(Pair("totalbytessent", CNode::GetTotalBytesSent()));
     obj.push_back(Pair("timemillis", GetTimeMillis()));
+
+    UniValue sentByCMD(UniValue::VOBJ);
+    std::map<std::string, uint64_t> mapTotalBytesSentByCmd = CNode::GetTotalBytesSentByCmd();
+    for (std::map<std::string, uint64_t>::iterator it = mapTotalBytesSentByCmd.begin(); it != mapTotalBytesSentByCmd.end(); it++)
+    {
+        sentByCMD.push_back(Pair((std::string)((*it).first), (*it).second));
+    }
+    obj.push_back(Pair("totalbytessentbycmd", sentByCMD));
+
+    UniValue recvByCMD(UniValue::VOBJ);
+    std::map<std::string, uint64_t> mapTotalBytesRecvByCmd = CNode::GetTotalBytesRecvByCmd();
+    for (std::map<std::string, uint64_t>::iterator it = mapTotalBytesRecvByCmd.begin(); it != mapTotalBytesRecvByCmd.end(); it++)
+    {
+        recvByCMD.push_back(Pair((std::string)((*it).first), (*it).second));
+    }
+    obj.push_back(Pair("totalbytesrecvbycmd", recvByCMD));
+
+    if (params.size() == 1 && params[0].get_str() == "1")
+    {
+        UniValue sentOverTimeByCMD(UniValue::VOBJ);
+        mapTimeLog_t mapTotalBytesSentByCmdOverTime = CNode::GetTotalBytesSentByCmdOverTime();
+
+        for (mapTimeLog_t::iterator it = mapTotalBytesSentByCmdOverTime.begin(); it != mapTotalBytesSentByCmdOverTime.end(); it++)
+        {
+            UniValue sentOverTimeByOneCMD(UniValue::VARR);
+            for (std::vector<timeSize_t>::iterator it2 = (*it).second.begin(); it2 != (*it).second.end(); it2++)
+            {
+                UniValue rec(UniValue::VOBJ);
+                rec.push_back(Pair("time", (*it2).first));
+                rec.push_back(Pair("bytesdelta", (*it2).second));
+                sentOverTimeByOneCMD.push_back(rec);
+            }
+
+            sentOverTimeByCMD.push_back(Pair((*it).first, sentOverTimeByOneCMD));
+        }
+
+        obj.push_back(Pair("sentovertimebycmd", sentOverTimeByCMD));
+
+        UniValue recvOverTimeByCMD(UniValue::VOBJ);
+        mapTimeLog_t mapTotalBytesRecvByCmdOverTime = CNode::GetTotalBytesRecvByCmdOverTime();
+
+        for (mapTimeLog_t::iterator it = mapTotalBytesRecvByCmdOverTime.begin(); it != mapTotalBytesRecvByCmdOverTime.end(); it++)
+        {
+            UniValue recvOverTimeByOneCMD(UniValue::VARR);
+            for (std::vector<timeSize_t>::iterator it2 = (*it).second.begin(); it2 != (*it).second.end(); it2++)
+            {
+                UniValue rec(UniValue::VOBJ);
+                rec.push_back(Pair("time", (*it2).first));
+                rec.push_back(Pair("bytesdelta", (*it2).second));
+                recvOverTimeByOneCMD.push_back(rec);
+            }
+
+            recvOverTimeByCMD.push_back(Pair((*it).first, recvOverTimeByOneCMD));
+        }
+
+        obj.push_back(Pair("recvovertimebycmd", recvOverTimeByCMD));
+    }
+
     return obj;
 }
 

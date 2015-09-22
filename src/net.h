@@ -182,6 +182,9 @@ extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 typedef std::map<std::string, uint64_t > mapCmdSize_t; //command, total bytes
 
+typedef std::pair<uint64_t, uint64_t> timeSize_t;
+typedef std::map<std::string, std::vector<timeSize_t> > mapTimeLog_t;
+
 class CNodeStats
 {
 public:
@@ -413,6 +416,10 @@ private:
     static CCriticalSection cs_totalBytesSent;
     static uint64_t nTotalBytesRecv;
     static uint64_t nTotalBytesSent;
+    static std::map<std::string, uint64_t> mapTotalBytesSentByCmd;
+    static std::map<std::string, uint64_t> mapTotalBytesRecvByCmd;
+    static mapTimeLog_t mapTotalBytesRecvByCmdOverTime;
+    static mapTimeLog_t mapTotalBytesSentByCmdOverTime;
 
     CNode(const CNode&);
     void operator=(const CNode&);
@@ -711,7 +718,12 @@ public:
 
     // Network stats
     static void RecordBytesRecv(uint64_t bytes);
-    static void RecordBytesSent(uint64_t bytes);
+    static void RecordBytesSent(uint64_t bytes, const CSerializeData &data);
+    static void AppendMeasurementToVector(uint64_t now, uint64_t bytes, std::vector<timeSize_t> &vecMeasurements);
+    static mapTimeLog_t GetTotalBytesSentByCmdOverTime();
+    static mapTimeLog_t GetTotalBytesRecvByCmdOverTime();
+    static std::map<std::string, uint64_t> GetTotalBytesSentByCmd();
+    static std::map<std::string, uint64_t> GetTotalBytesRecvByCmd();
 
     static uint64_t GetTotalBytesRecv();
     static uint64_t GetTotalBytesSent();

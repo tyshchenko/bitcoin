@@ -57,6 +57,8 @@ using namespace std;
 
 namespace {
     const int MAX_OUTBOUND_CONNECTIONS = 8;
+    const int MIN_NETUSAGE_LOG_TIME_DELTA = 10; //in seconds
+    const int MAX_LOG_TIME = 60*60*24*7; //ony week
 
     struct ListenSocket {
         SOCKET socket;
@@ -326,6 +328,10 @@ uint64_t CNode::nTotalBytesRecv = 0;
 uint64_t CNode::nTotalBytesSent = 0;
 CCriticalSection CNode::cs_totalBytesRecv;
 CCriticalSection CNode::cs_totalBytesSent;
+std::map<std::string, uint64_t> CNode::mapTotalBytesSentByCmd;
+std::map<std::string, uint64_t> CNode::mapTotalBytesRecvByCmd;
+mapTimeLog_t CNode::mapTotalBytesSentByCmdOverTime;
+mapTimeLog_t CNode::mapTotalBytesRecvByCmdOverTime;
 
 CNode* FindNode(const CNetAddr& ip)
 {
@@ -651,8 +657,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
     while (nBytes > 0) {
 
         // get current incomplete message, or create a new one
-        if (vRecvMsg.empty() ||
-            vRecvMsg.back().complete())
+        if (vRecvMsg.empty() || vRecvMsg.back().complete())
             vRecvMsg.push_back(CNetMessage(Params().MessageStart(), SER_NETWORK, nRecvVersion));
 
         CNetMessage& msg = vRecvMsg.back();
@@ -671,6 +676,18 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             LogPrint("net", "Oversized message from peer=%i, disconnecting", GetId());
             return false;
         }
+
+        //add time/bytes-delta to a vector aggregated by p2p command
+        //the measurements vector can have variable time deltas (no thread, no additional locking)
+        uint64_t now = GetTime();
+        {
+            LOCK(cs_totalBytesSent);
+            std::string cmd = msg.hdr.GetCommand();
+            mapTotalBytesRecvByCmd[cmd]+=nBytes;
+            AppendMeasurementToVector(now, mapTotalBytesRecvByCmd[cmd], mapTotalBytesRecvByCmdOverTime[cmd]);
+        }
+
+
 
         pch += handled;
         nBytes -= handled;
@@ -765,7 +782,7 @@ void SocketSendData(CNode *pnode)
             pnode->nLastSend = GetTime();
             pnode->nSendBytes += nBytes;
             pnode->nSendOffset += nBytes;
-            pnode->RecordBytesSent(nBytes);
+            pnode->RecordBytesSent(nBytes, data);
             if (pnode->nSendOffset == data.size()) {
                 pnode->nSendOffset = 0;
                 pnode->nSendSize -= data.size();
@@ -1924,10 +1941,60 @@ void CNode::RecordBytesRecv(uint64_t bytes)
     nTotalBytesRecv += bytes;
 }
 
-void CNode::RecordBytesSent(uint64_t bytes)
+void CNode::RecordBytesSent(uint64_t bytes, const CSerializeData &data)
 {
+    //get command from serialized data
+    const char *cmd = &data[4];
+    std::string strCmd = std::string(cmd);
+    uint64_t now = GetTime();
+
     LOCK(cs_totalBytesSent);
     nTotalBytesSent += bytes;
+    mapTotalBytesSentByCmd[strCmd] += bytes;
+    if (strCmd == "getaddr")
+    {
+        int asdasd = 1;
+    }
+    //add time/bytes-delta to a vector aggregated by p2p command
+    //the measurements can have variable time deltas
+    AppendMeasurementToVector(now, mapTotalBytesSentByCmd[strCmd], mapTotalBytesSentByCmdOverTime[strCmd]);
+}
+
+void CNode::AppendMeasurementToVector(uint64_t now, uint64_t bytes, std::vector<timeSize_t> &vecMeasurements)
+{
+    if (vecMeasurements.size() == 0 || vecMeasurements.back().first+MIN_NETUSAGE_LOG_TIME_DELTA < now)
+    {
+        //store bytes with a timestap
+        vecMeasurements.push_back(std::make_pair(now, bytes));
+
+        //make sure we only store up the desired timeframe
+        if (vecMeasurements.back().first - vecMeasurements.front().first > MAX_LOG_TIME)
+            vecMeasurements.erase(vecMeasurements.begin());
+    }
+}
+
+mapTimeLog_t CNode::GetTotalBytesSentByCmdOverTime()
+{
+    LOCK(cs_totalBytesSent);
+    return mapTotalBytesSentByCmdOverTime;
+}
+
+mapTimeLog_t CNode::GetTotalBytesRecvByCmdOverTime()
+{
+    LOCK(cs_totalBytesRecv);
+    return mapTotalBytesRecvByCmdOverTime;
+}
+
+std::map<std::string, uint64_t> CNode::GetTotalBytesSentByCmd()
+{
+    LOCK(cs_totalBytesSent);
+    return mapTotalBytesSentByCmd;
+}
+
+std::map<std::string, uint64_t> CNode::GetTotalBytesRecvByCmd()
+{
+    LOCK(cs_totalBytesRecv);
+    return mapTotalBytesRecvByCmd;
 }
 
 uint64_t CNode::GetTotalBytesRecv()
