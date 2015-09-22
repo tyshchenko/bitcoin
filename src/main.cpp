@@ -3760,7 +3760,18 @@ void static ProcessGetData(CNode* pfrom)
                     if (!ReadBlockFromDisk(block, (*mi).second))
                         assert(!"cannot load block from disk");
                     if (inv.type == MSG_BLOCK)
-                        pfrom->PushMessage("block", block);
+                    {
+                        int size = pfrom->PushMessage("block", block);
+
+                        if ((pindexBestHeader != NULL) && (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() > 3 * 24 * 60 * 60))
+                        {
+                            CNode::nTotalBytesBlockHistory += size;
+                        }
+                        else
+                        {
+                            CNode::nTotalBytesBlockNonHistory += size;
+                        }
+                    }
                     else // MSG_FILTERED_BLOCK)
                     {
                         LOCK(pfrom->cs_filter);
@@ -3777,7 +3788,10 @@ void static ProcessGetData(CNode* pfrom)
                             typedef std::pair<unsigned int, uint256> PairType;
                             BOOST_FOREACH(PairType& pair, merkleBlock.vMatchedTxn)
                                 if (!pfrom->setInventoryKnown.count(CInv(MSG_TX, pair.second)))
-                                    pfrom->PushMessage("tx", block.vtx[pair.first]);
+                                {
+                                    int size = pfrom->PushMessage("tx", block.vtx[pair.first]);
+                                    CNode::nTotalBytesMerkleBlockTx += size;
+                                }
                         }
                         // else
                             // no response

@@ -397,6 +397,10 @@ UniValue getnettotals(const UniValue& params, bool fHelp)
     obj.push_back(Pair("totalbytessent", CNode::GetTotalBytesSent()));
     obj.push_back(Pair("timemillis", GetTimeMillis()));
 
+    obj.push_back(Pair("block_bytes_history", CNode::nTotalBytesBlockHistory));
+    obj.push_back(Pair("block_bytes_non_history", CNode::nTotalBytesBlockNonHistory));
+    obj.push_back(Pair("block_bytes_merkle_tx", CNode::nTotalBytesMerkleBlockTx));
+
     UniValue sentByCMD(UniValue::VOBJ);
     std::map<std::string, uint64_t> mapTotalBytesSentByCmd = CNode::GetTotalBytesSentByCmd();
     for (std::map<std::string, uint64_t>::iterator it = mapTotalBytesSentByCmd.begin(); it != mapTotalBytesSentByCmd.end(); it++)

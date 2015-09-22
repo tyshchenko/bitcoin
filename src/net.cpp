@@ -10,6 +10,8 @@
 #include "net.h"
 
 #include "addrman.h"
+#include "chain.h"
+#include "main.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "crypto/common.h"
@@ -332,6 +334,9 @@ std::map<std::string, uint64_t> CNode::mapTotalBytesSentByCmd;
 std::map<std::string, uint64_t> CNode::mapTotalBytesRecvByCmd;
 mapTimeLog_t CNode::mapTotalBytesSentByCmdOverTime;
 mapTimeLog_t CNode::mapTotalBytesRecvByCmdOverTime;
+uint64_t CNode::nTotalBytesBlockHistory = 0;
+uint64_t CNode::nTotalBytesBlockNonHistory = 0;
+uint64_t CNode::nTotalBytesMerkleBlockTx = 0;
 
 CNode* FindNode(const CNetAddr& ip)
 {
@@ -1951,9 +1956,16 @@ void CNode::RecordBytesSent(uint64_t bytes, const CSerializeData &data)
     LOCK(cs_totalBytesSent);
     nTotalBytesSent += bytes;
     mapTotalBytesSentByCmd[strCmd] += bytes;
-    if (strCmd == "getaddr")
+    if (strCmd == "block")
     {
-        int asdasd = 1;
+        CDataStream ssData(&data[24],&data[data.size()-24], SER_DISK, CLIENT_VERSION);
+        CBlockHeader blkhdr;
+        ssData >> blkhdr;
+
+        CBlockIndex *pindex = NULL;
+        BlockMap::iterator it = mapBlockIndex.find(blkhdr.GetHash());
+        if (it != mapBlockIndex.end())
+            pindex = it->second;
     }
     //add time/bytes-delta to a vector aggregated by p2p command
     //the measurements can have variable time deltas

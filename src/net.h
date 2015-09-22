@@ -410,6 +410,10 @@ public:
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     ~CNode();
 
+    static uint64_t nTotalBytesBlockHistory;
+    static uint64_t nTotalBytesBlockNonHistory;
+    static uint64_t nTotalBytesMerkleBlockTx;
+
 private:
     // Network usage totals
     static CCriticalSection cs_totalBytesRecv;
@@ -535,13 +539,15 @@ public:
     }
 
     template<typename T1>
-    void PushMessage(const char* pszCommand, const T1& a1)
+    int PushMessage(const char* pszCommand, const T1& a1)
     {
         try
         {
             BeginMessage(pszCommand);
             ssSend << a1;
+            int size = ssSend.size();
             EndMessage(pszCommand);
+            return size;
         }
         catch (...)
         {
