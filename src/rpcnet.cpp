@@ -417,6 +417,18 @@ UniValue getnettotals(const UniValue& params, bool fHelp)
     }
     obj.push_back(Pair("totalbytesrecvbycmd", recvByCMD));
 
+    UniValue minMaxPerNode(UniValue::VOBJ);
+    std::map<std::string, std::pair<int, int> > mapNodeSentBlocksMinMaxHeight = CNode::mapNodeSentBlocksMinMaxHeight;
+    for (std::map<std::string, std::pair<int, int> >::iterator it = mapNodeSentBlocksMinMaxHeight.begin(); it != mapNodeSentBlocksMinMaxHeight.end(); it++)
+    {
+        UniValue oneNodeMaxMin(UniValue::VARR);
+        oneNodeMaxMin.push_back((*it).second.first);
+        oneNodeMaxMin.push_back((*it).second.second);
+
+        minMaxPerNode.push_back(Pair((std::string)((*it).first), oneNodeMaxMin));
+    }
+    obj.push_back(Pair("minMaxPerNode", minMaxPerNode));
+
     if (params.size() == 1 && params[0].get_str() == "1")
     {
         UniValue sentOverTimeByCMD(UniValue::VOBJ);
