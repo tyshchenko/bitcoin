@@ -337,6 +337,7 @@ mapTimeLog_t CNode::mapTotalBytesRecvByCmdOverTime;
 uint64_t CNode::nTotalBytesBlockHistory = 0;
 uint64_t CNode::nTotalBytesBlockNonHistory = 0;
 uint64_t CNode::nTotalBytesMerkleBlockTx = 0;
+std::map<std::string, std::pair<int, int> > CNode::mapNodeSentBlocksMinMaxHeight;
 
 CNode* FindNode(const CNetAddr& ip)
 {

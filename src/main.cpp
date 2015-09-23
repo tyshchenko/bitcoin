@@ -3771,6 +3771,12 @@ void static ProcessGetData(CNode* pfrom)
                         {
                             CNode::nTotalBytesBlockNonHistory += size;
                         }
+
+                        if (CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].first == 0 || mi->second->nHeight < CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].first)
+                            CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].first = mi->second->nHeight;
+
+                        if (CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].second == 0 || mi->second->nHeight > CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].second)
+                            CNode::mapNodeSentBlocksMinMaxHeight[pfrom->addrName].second = mi->second->nHeight;
                     }
                     else // MSG_FILTERED_BLOCK)
                     {

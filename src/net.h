@@ -414,6 +414,8 @@ public:
     static uint64_t nTotalBytesBlockNonHistory;
     static uint64_t nTotalBytesMerkleBlockTx;
 
+    static std::map<std::string, std::pair<int, int> > mapNodeSentBlocksMinMaxHeight;
+
 private:
     // Network usage totals
     static CCriticalSection cs_totalBytesRecv;
