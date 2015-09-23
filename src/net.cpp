@@ -1957,17 +1957,7 @@ void CNode::RecordBytesSent(uint64_t bytes, const CSerializeData &data)
     LOCK(cs_totalBytesSent);
     nTotalBytesSent += bytes;
     mapTotalBytesSentByCmd[strCmd] += bytes;
-    if (strCmd == "block")
-    {
-        CDataStream ssData(&data[24],&data[data.size()-24], SER_DISK, CLIENT_VERSION);
-        CBlockHeader blkhdr;
-        ssData >> blkhdr;
 
-        CBlockIndex *pindex = NULL;
-        BlockMap::iterator it = mapBlockIndex.find(blkhdr.GetHash());
-        if (it != mapBlockIndex.end())
-            pindex = it->second;
-    }
     //add time/bytes-delta to a vector aggregated by p2p command
     //the measurements can have variable time deltas
     AppendMeasurementToVector(now, mapTotalBytesSentByCmd[strCmd], mapTotalBytesSentByCmdOverTime[strCmd]);
