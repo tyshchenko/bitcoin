@@ -11,6 +11,7 @@
 #include "net.h"
 
 #include <QWidget>
+#include <QTextEdit>
 
 class ClientModel;
 class PlatformStyle;
