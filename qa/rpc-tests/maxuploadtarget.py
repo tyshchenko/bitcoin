@@ -192,7 +192,7 @@ class MaxUploadTest(BitcoinTestFramework):
         getdata_request.inv.append(CInv(2, big_old_block))
 
         max_bytes_per_day = 200*1024*1024
-        daily_buffer = 144 * 1000000 # 144 * MAX_BLOCK_SIZE
+        daily_buffer = 144 * 1000000
         max_bytes_available = max_bytes_per_day - daily_buffer
         success_count = max_bytes_available / old_block_size
         
