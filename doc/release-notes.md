@@ -159,8 +159,13 @@ parameter. This is *not* a hard limit but a threshold to minimize the outbound
 traffic. When the limit is about to be reached, the uploaded data is cut by not
 serving historic blocks (blocks older than one week).
 Moreover, any SPV peer is disconnected when they request a filtered block.
+A major part of the outbound traffic is caused by serving historic blocks to
+other nodes in initial block download state.
 
 This option can be specified in MiB per day and is turned off by default.
+The recommended minimum is 144 * MAX_BLOCK_SIZE (currently 144MB) per day.
+Setting `-maxuploadtarget` to zero, will result in not serving any historic
+block and disconnecting every SPV client that requests a filtered block.
 
 
 0.12.0 Change log
