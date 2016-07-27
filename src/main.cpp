@@ -28,6 +28,7 @@
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "scheduler.h"
+#include "stats.h"
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
@@ -1124,6 +1125,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
                               std::vector<uint256>& vHashTxnToUncache, int64_t nAcceptTime)
 {
     const uint256 hash = tx.GetHash();
+    CFeeRate poolMinFeeRate;
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
         *pfMissingInputs = false;
@@ -1301,7 +1303,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false,
                 strprintf("%d", nSigOpsCost));
 
-        CAmount mempoolRejectFee = pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
+        poolMinFeeRate = pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
+        CAmount mempoolRejectFee = poolMinFeeRate.GetFee(nSize);
         if (mempoolRejectFee > 0 && nModifiedFees < mempoolRejectFee) {
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false, strprintf("%d < %d", nFees, mempoolRejectFee));
         } else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(entry.GetPriority(chainActive.Height() + 1))) {
@@ -1547,6 +1550,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         }
     }
 
+    CStats::DefaultStats()->addMempoolSample(pool.size(), pool.DynamicMemoryUsage(), poolMinFeeRate.GetFeePerK());
     SyncWithWallets(tx, NULL, NULL);
 
     return true;
@@ -6812,6 +6816,7 @@ bool LoadMempool(void)
         uint64_t num;
         file >> num;
         double prioritydummy = 0;
+        LOCK(cs_main);
         while (num--) {
             CTransaction tx;
             int64_t nTime;

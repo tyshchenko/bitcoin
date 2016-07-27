@@ -19,6 +19,8 @@
 #include "wallet.h"
 #include "walletdb.h"
 
+#include "stats.h"
+
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
@@ -2292,6 +2294,7 @@ UniValue getwalletinfo(const UniValue& params, bool fHelp)
     CKeyID masterKeyID = pwalletMain->GetHDChain().masterKeyID;
     if (!masterKeyID.IsNull())
          obj.push_back(Pair("hdmasterkeyid", masterKeyID.GetHex()));
+
     return obj;
 }
 
