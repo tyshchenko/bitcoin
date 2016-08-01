@@ -199,6 +199,7 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
+    DumpMempool();
 
     if (fFeeEstimatesInitialized)
     {
@@ -581,7 +582,7 @@ void CleanupBlockRevFiles()
     }
 }
 
-void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
+void ThreadImport(std::vector<boost::filesystem::path> vImportFiles, CScheduler* scheduler)
 {
     const CChainParams& chainparams = Params();
     RenameThread("bitcoin-loadblk");
@@ -644,6 +645,9 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
         LogPrintf("Stopping after block import\n");
         StartShutdown();
     }
+
+    LoadMempool();
+    ScheduleDumpMempool(*scheduler);
 }
 
 /** Sanity checks
@@ -1439,7 +1443,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             vImportFiles.push_back(strFile);
     }
 
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles, &scheduler));
 
     // Wait for genesis block to be processed
     {
