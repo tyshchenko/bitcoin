@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_DB_H
 
 #include "clientversion.h"
+#include "wallet/dbadapter.h"
 #include "serialize.h"
 #include "streams.h"
 #include "sync.h"
@@ -91,7 +92,7 @@ extern CDBEnv bitdb;
 
 
 /** RAII class that provides access to a Berkeley database */
-class CDB
+class CDB : public CWalletDBAdapterAbstract
 {
 protected:
     Db* pdb;
@@ -100,10 +101,10 @@ protected:
     bool fReadOnly;
     bool fFlushOnClose;
 
-    explicit CDB(const std::string& strFilename, const char* pszMode = "r+", bool fFlushOnCloseIn=true);
     ~CDB() { Close(); }
 
 public:
+    explicit CDB(const std::string& strFilename, const char* pszMode = "r+", bool fFlushOnCloseIn=true);
     void Flush();
     void Close();
 
@@ -112,16 +113,11 @@ private:
     void operator=(const CDB&);
 
 protected:
-    template <typename K, typename T>
-    bool Read(const K& key, T& value)
+    bool ReadS(CDataStream& ssKey, CDataStream& value)
     {
         if (!pdb)
             return false;
 
-        // Key
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-        ssKey.reserve(1000);
-        ssKey << key;
         Dbt datKey(&ssKey[0], ssKey.size());
 
         // Read
@@ -134,8 +130,7 @@ protected:
 
         // Unserialize value
         try {
-            CDataStream ssValue((char*)datValue.get_data(), (char*)datValue.get_data() + datValue.get_size(), SER_DISK, CLIENT_VERSION);
-            ssValue >> value;
+            value.insert(value.begin(), (char*)datValue.get_data(), (char*)datValue.get_data() + datValue.get_size());
         } catch (const std::exception&) {
             return false;
         }
@@ -146,24 +141,14 @@ protected:
         return (ret == 0);
     }
 
-    template <typename K, typename T>
-    bool Write(const K& key, const T& value, bool fOverwrite = true)
+    bool WriteS(CDataStream& ssKey, CDataStream& ssValue, bool fOverwrite = true)
     {
         if (!pdb)
             return false;
         if (fReadOnly)
             assert(!"Write called on database in read-only mode");
 
-        // Key
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-        ssKey.reserve(1000);
-        ssKey << key;
         Dbt datKey(&ssKey[0], ssKey.size());
-
-        // Value
-        CDataStream ssValue(SER_DISK, CLIENT_VERSION);
-        ssValue.reserve(10000);
-        ssValue << value;
         Dbt datValue(&ssValue[0], ssValue.size());
 
         // Write
@@ -175,18 +160,13 @@ protected:
         return (ret == 0);
     }
 
-    template <typename K>
-    bool Erase(const K& key)
+    bool EraseS(CDataStream& ssKey)
     {
         if (!pdb)
             return false;
         if (fReadOnly)
             assert(!"Erase called on database in read-only mode");
 
-        // Key
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-        ssKey.reserve(1000);
-        ssKey << key;
         Dbt datKey(&ssKey[0], ssKey.size());
 
         // Erase
@@ -197,16 +177,11 @@ protected:
         return (ret == 0 || ret == DB_NOTFOUND);
     }
 
-    template <typename K>
-    bool Exists(const K& key)
+    bool ExistsS(CDataStream& ssKey)
     {
         if (!pdb)
             return false;
 
-        // Key
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-        ssKey.reserve(1000);
-        ssKey << key;
         Dbt datKey(&ssKey[0], ssKey.size());
 
         // Exists
@@ -217,7 +192,7 @@ protected:
         return (ret == 0);
     }
 
-    Dbc* GetCursor()
+    DBAstractCursor* GetCursor()
     {
         if (!pdb)
             return NULL;
@@ -225,22 +200,29 @@ protected:
         int ret = pdb->cursor(NULL, &pcursor, 0);
         if (ret != 0)
             return NULL;
-        return pcursor;
+        return (DBAstractCursor *)pcursor;
     }
 
-    int ReadAtCursor(Dbc* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = DB_NEXT)
+    void CloseCursor(DBAstractCursor* abstractcursor)
     {
+        Dbc* pcursor = (Dbc *)abstractcursor;
+        if (!pdb)
+            return;
+        pcursor->close();
+    }
+
+    int ReadAtCursor(DBAstractCursor* abstractcursor, CDataStream& ssKey, CDataStream& ssValue, bool set_range)
+    {
+        Dbc* pcursor = (Dbc *)abstractcursor;
         // Read at cursor
         Dbt datKey;
-        if (fFlags == DB_SET || fFlags == DB_SET_RANGE || fFlags == DB_GET_BOTH || fFlags == DB_GET_BOTH_RANGE) {
+        unsigned int fFlags = DB_NEXT;
+        if (set_range) {
             datKey.set_data(&ssKey[0]);
             datKey.set_size(ssKey.size());
+            fFlags = DB_SET_RANGE;
         }
         Dbt datValue;
-        if (fFlags == DB_GET_BOTH || fFlags == DB_GET_BOTH_RANGE) {
-            datValue.set_data(&ssValue[0]);
-            datValue.set_size(ssValue.size());
-        }
         datKey.set_flags(DB_DBT_MALLOC);
         datValue.set_flags(DB_DBT_MALLOC);
         int ret = pcursor->get(&datKey, &datValue, fFlags);

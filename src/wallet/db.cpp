@@ -382,7 +382,7 @@ bool CDB::Rewrite(const string& strFile, const char* pszSkip)
                         fSuccess = false;
                     }
 
-                    Dbc* pcursor = db.GetCursor();
+                    Dbc* pcursor = (Dbc *)db.GetCursor();
                     if (pcursor)
                         while (fSuccess) {
                             CDataStream ssKey(SER_DISK, CLIENT_VERSION);

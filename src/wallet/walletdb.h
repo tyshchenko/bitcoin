@@ -9,6 +9,7 @@
 #include "amount.h"
 #include "primitives/transaction.h"
 #include "wallet/db.h"
+#include "wallet/dbadapter.h"
 #include "key.h"
 
 #include <list>
@@ -115,12 +116,15 @@ public:
 };
 
 /** Access to the wallet database */
-class CWalletDB : public CDB
+class CWalletDB
 {
 public:
-    CWalletDB(const std::string& strFilename, const char* pszMode = "r+", bool fFlushOnClose = true) : CDB(strFilename, pszMode, fFlushOnClose)
+    CWalletDB(const std::string& strFilename, const char* pszMode = "r+", bool fFlushOnClose = true)
     {
+        persistantStorage = CWalletDBAdapterAbstract::initWithType(strFilename, pszMode, fFlushOnClose);
     }
+
+    ~CWalletDB() { delete persistantStorage; }
 
     bool WriteName(const std::string& strAddress, const std::string& strName);
     bool EraseName(const std::string& strAddress);
@@ -178,7 +182,12 @@ public:
     //! write the hdchain model (external chain child index counter)
     bool WriteHDChain(const CHDChain& chain);
 
+    // pass transaction functions to persistant storge manager
+    bool TxnBegin() { return persistantStorage->TxnBegin(); }
+    bool TxnCommit() { return persistantStorage->TxnCommit(); }
+    bool TxnAbort() { return persistantStorage->TxnAbort(); }
 private:
+    CWalletDBAdapterAbstract *persistantStorage;
     CWalletDB(const CWalletDB&);
     void operator=(const CWalletDB&);
 
