@@ -18,6 +18,9 @@
 #include <QFileDialog>
 #include <QSettings>
 #include <QMessageBox>
+#include <QResizeEvent>
+#include <QPropertyAnimation>
+#include <QTimer>
 
 #include <cmath>
 
@@ -122,14 +125,51 @@ Intro::Intro(QWidget *parent) :
     signalled(false)
 {
     ui->setupUi(this);
-    ui->welcomeLabel->setText(ui->welcomeLabel->text().arg(tr(PACKAGE_NAME)));
     ui->storageLabel->setText(ui->storageLabel->text().arg(tr(PACKAGE_NAME)));
+    ui->page0HeaderLabel->setText(ui->page0HeaderLabel->text().arg(tr(PACKAGE_NAME)));
+    ui->page0DescriptionLabel->setText(ui->page0DescriptionLabel->text().arg(tr(PACKAGE_NAME)));
     uint64_t pruneTarget = std::max<int64_t>(0, GetArg("-prune", 0));
     requiredSpace = BLOCK_CHAIN_SIZE;
     if (pruneTarget)
         requiredSpace = CHAIN_STATE_SIZE + std::ceil(pruneTarget * 1024 * 1024.0 / GB_BYTES);
     ui->sizeWarningLabel->setText(ui->sizeWarningLabel->text().arg(tr(PACKAGE_NAME)).arg(requiredSpace));
     startThread();
+
+    if (parent) {
+        parent->installEventFilter(this);
+        raise();
+    }
+
+    // set up pages
+    currentPage = 0;
+    ui->wizardPage0->move(0, 0);
+    ui->wizardPage1->move(ui->wizardPage1->width(), 0);
+    ui->wizardPage2->move(ui->wizardPage1->width()+ui->wizardPage2->width(), 0);
+    ui->wizardPage3->move(ui->wizardPage1->width()+ui->wizardPage2->width()+ui->wizardPage3->width(), 0);
+
+    // set icon offset positions
+    ui->page0Icon->move(QPoint(ui->page0Icon->pos().x(),ui->page0Icon->pos().y()-ui->page0Icon->height()));
+    ui->page1Icon->move(QPoint(ui->page1Icon->pos().x(),ui->page1Icon->pos().y()-ui->page1Icon->height()));
+    ui->page2Icon->move(QPoint(ui->page2Icon->pos().x(),ui->page2Icon->pos().y()-ui->page2Icon->height()));
+    ui->page3Icon->move(QPoint(ui->page3Icon->pos().x(),ui->page3Icon->pos().y()-ui->page3Icon->height()));
+
+    // connect buttons
+    connect(ui->page0NextButton, SIGNAL(clicked()), this, SLOT(nextButtonClicked()));
+    connect(ui->page1NextButton, SIGNAL(clicked()), this, SLOT(nextButtonClicked()));
+    connect(ui->page2NextButton, SIGNAL(clicked()), this, SLOT(nextButtonClicked()));
+
+    connect(ui->page1Previous, SIGNAL(clicked()), this, SLOT(prevButtonClicked()));
+    connect(ui->page2Previous, SIGNAL(clicked()), this, SLOT(prevButtonClicked()));
+    connect(ui->page3Previous, SIGNAL(clicked()), this, SLOT(prevButtonClicked()));
+
+    connect(ui->cacheSizeButton0, SIGNAL(clicked()), this, SLOT(dbCacheButtonClicked()));
+    connect(ui->cacheSizeButton1, SIGNAL(clicked()), this, SLOT(dbCacheButtonClicked()));
+    connect(ui->cacheSizeButton2, SIGNAL(clicked()), this, SLOT(dbCacheButtonClicked()));
+    connect(ui->cacheSizeButton3, SIGNAL(clicked()), this, SLOT(dbCacheButtonClicked()));
+
+
+    // slide in first icon
+    QTimer::singleShot(700, this, SLOT(fadeInIcon()));
 }
 
 Intro::~Intro()
@@ -138,6 +178,92 @@ Intro::~Intro()
     /* Ensure thread is finished before it is deleted */
     Q_EMIT stopThread();
     thread->wait();
+}
+
+void Intro::fadeInIcon()
+{
+    // then a animation:
+    QWidget *icon = ui->page0Icon;
+    if (currentPage == 1)
+        icon = ui->page1Icon;
+    if (currentPage == 2)
+        icon = ui->page2Icon;
+    if (currentPage == 3)
+        icon = ui->page3Icon;
+
+    if (icon->pos().y() >= -100)
+        return;
+
+    QPropertyAnimation* animation0 = new QPropertyAnimation(icon, "pos");
+    animation0->setDuration(700);
+    animation0->setStartValue(icon->pos());
+    animation0->setEndValue(QPoint(icon->pos().x(),icon->pos().y()+icon->height()));
+    animation0->setEasingCurve(QEasingCurve::OutQuad);
+    // to slide in call
+    animation0->start(QAbstractAnimation::DeleteWhenStopped);
+
+}
+void Intro::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    ui->wizardPage0->resize(size());
+    ui->wizardPage1->resize(size());
+    ui->wizardPage2->resize(size());
+    ui->wizardPage3->resize(size());
+}
+
+void Intro::nextButtonClicked()
+{
+    movePages();
+    currentPage++;
+    QTimer::singleShot(300, this, SLOT(fadeInIcon()));
+}
+
+void Intro::prevButtonClicked()
+{
+    movePages(true);
+    currentPage--;
+    QTimer::singleShot(300, this, SLOT(fadeInIcon()));
+}
+
+void Intro::movePages(bool backward)
+{
+    // then a animation:
+    QVector<QWidget *> pages;
+    pages << ui->wizardPage0 << ui->wizardPage1 << ui->wizardPage2 << ui->wizardPage3;
+
+    for (QWidget *page : pages)
+    {
+        QPropertyAnimation* animation0 = new QPropertyAnimation(page, "pos");
+        animation0->setDuration(300);
+        animation0->setStartValue(page->pos());
+        animation0->setEndValue(QPoint(page->pos().x() - (backward ? -page->width() : page->width()), 0));
+        animation0->setEasingCurve(QEasingCurve::OutQuad);
+        // to slide in call
+        animation0->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+}
+
+void Intro::dbCacheButtonClicked()
+{
+    ui->cacheSizeButton0->setChecked(sender() == ui->cacheSizeButton0);
+    ui->cacheSizeButton1->setChecked(sender() == ui->cacheSizeButton1);
+    ui->cacheSizeButton2->setChecked(sender() == ui->cacheSizeButton2);
+    ui->cacheSizeButton3->setChecked(sender() == ui->cacheSizeButton3);
+}
+
+void Intro::closeButtonClicked()
+{
+    // then a animation:
+    QPropertyAnimation* animation = new QPropertyAnimation(ui->wizardPage2, "pos");
+    animation->setDuration(300);
+    animation->setStartValue(ui->wizardPage2->pos());
+    animation->setEndValue(QPoint(0, height()));
+    animation->setEasingCurve(QEasingCurve::OutQuad);
+    // to slide in call
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+
+    ui->wizardPage3->setVisible(true);
 }
 
 QString Intro::getDataDirectory()

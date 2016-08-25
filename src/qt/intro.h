@@ -60,6 +60,11 @@ private Q_SLOTS:
     void on_ellipsisButton_clicked();
     void on_dataDirDefault_clicked();
     void on_dataDirCustom_clicked();
+    void nextButtonClicked();
+    void prevButtonClicked();
+    void closeButtonClicked();
+    void fadeInIcon();
+    void dbCacheButtonClicked();
 
 private:
     Ui::Intro *ui;
@@ -67,12 +72,15 @@ private:
     QMutex mutex;
     bool signalled;
     QString pathToCheck;
-
+    int currentPage;
     void startThread();
     void checkPath(const QString &dataDir);
     QString getPathToCheck();
 
     friend class FreespaceChecker;
+
+    virtual void resizeEvent(QResizeEvent *event);
+    void movePages(bool backward=false);
 };
 
 #endif // BITCOIN_QT_INTRO_H
