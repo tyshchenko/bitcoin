@@ -661,7 +661,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
         // get current incomplete message, or create a new one
         if (vRecvMsg.empty() ||
             vRecvMsg.back().complete())
-            vRecvMsg.push_back(CNetMessage(Params().MessageStart(), SER_NETWORK, nRecvVersion));
+            vRecvMsg.push_back(CNetMessage(Params().MessageStart(), SER_NETWORK, nRecvVersion, fEncrypted));
 
         CNetMessage& msg = vRecvMsg.back();
 
@@ -675,7 +675,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
         if (handled < 0)
                 return false;
 
-        if (msg.in_data && msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH) {
+        if ((msg.in_data && msg.fIsEncryptedPackage && msg.nCipertextSize > MAX_CRYPTED_PROTOCOL_MESSAGE_LENGTH) || (msg.in_data && msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH)) {
             LogPrint("net", "Oversized message from peer=%i, disconnecting\n", GetId());
             return false;
         }
@@ -687,11 +687,14 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
+
+            //TODO: encrypted messaged don't pass the mapRecvBytesPerMsgCmd filter, add it
+            //msg.complete() means we have checked the MAC tag
             mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.hdr.pchCommand);
             if (i == mapRecvBytesPerMsgCmd.end())
                 i = mapRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
             assert(i != mapRecvBytesPerMsgCmd.end());
-            i->second += msg.hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
+            i->second += (msg.fIsEncryptedPackage ? (msg.nCipertextSize + 16 + sizeof(uint32_t)) : (msg.hdr.nMessageSize + CMessageHeader::HEADER_SIZE));
 
             msg.nTime = GetTimeMicros();
             complete = true;
@@ -703,16 +706,28 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
 int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 {
+    unsigned int expectedHeaderSize = (fIsEncryptedPackage ? sizeof(uint32_t) : 24);
+
     // copy data to temporary parsing buffer
-    unsigned int nRemaining = 24 - nHdrPos;
+    unsigned int nRemaining = expectedHeaderSize - nHdrPos;
     unsigned int nCopy = std::min(nRemaining, nBytes);
 
     memcpy(&hdrbuf[nHdrPos], pch, nCopy);
     nHdrPos += nCopy;
 
     // if header incomplete, exit
-    if (nHdrPos < 24)
+    if (nHdrPos < expectedHeaderSize)
         return nCopy;
+
+    // check if it is an encrypted message package, deserialize its size
+    if (fIsEncryptedPackage)
+    {
+        hdrbuf >> nCipertextSize;
+        if (nCipertextSize > MAX_SIZE)
+            return -1;
+        in_data = true;
+        return nCopy;
+    }
 
     // deserialize to CMessageHeader
     try {
@@ -734,7 +749,8 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 
 int CNetMessage::readData(const char *pch, unsigned int nBytes)
 {
-    unsigned int nRemaining = hdr.nMessageSize - nDataPos;
+    // use nCipertextSize if we read and encrypted message package, append the MAC tag to data
+    unsigned int nRemaining = (fIsEncryptedPackage ? (nCipertextSize + 16) : hdr.nMessageSize) - nDataPos;
     unsigned int nCopy = std::min(nRemaining, nBytes);
 
     if (vRecv.size() < nDataPos + nCopy) {
@@ -742,10 +758,20 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
         vRecv.resize(std::min(hdr.nMessageSize, nDataPos + nCopy + 256 * 1024));
     }
 
-    hasher.Write((const unsigned char*)pch, nCopy);
+    if (!fIsEncryptedPackage)
+        hasher.Write((const unsigned char*)pch, nCopy);
+
     memcpy(&vRecv[nDataPos], pch, nCopy);
     nDataPos += nCopy;
 
+    // check if we have the MAC tag
+    if (fIsEncryptedPackage && nCipertextSize + 16 == nDataPos)
+    {
+        std::vector<unsigned int> macTag(16);
+        memcpy(&macTag[0], &vRecv[nDataPos-16], 16);
+        // TODO: verify MAC tag
+        fMACVerified = true;
+    }
     return nCopy;
 }
 
@@ -757,7 +783,18 @@ const uint256& CNetMessage::GetMessageHash() const
     return data_hash;
 }
 
+void CNetMessage::ForEachSubMessage(const std::function<void(const std::string& strCommand, CDataStream& vRecv, unsigned int nMessageSize)> func)
+{
+    // assume we have plaintext in vRecv
 
+    // dispatch each submessages
+    while (!vRecv.eof()) {
+        std::string cmd;
+        uint32_t len;
+        vRecv >> cmd >> len;
+        func(cmd, vRecv, len);
+    }
+}
 
 
 

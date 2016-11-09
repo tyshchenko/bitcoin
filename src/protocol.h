@@ -240,6 +240,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+/**
+ * Contains a 33 byte compressed ec pubkey & 1byte for the symetric cyper type
+ * @since protocol version 70015 as described by BIP 151
+ */
+extern const char *ENCINIT;
 };
 
 /* Get a vector of all valid message types (see above) */

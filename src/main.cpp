@@ -6397,7 +6397,7 @@ bool ProcessMessages(CNode* pfrom, CConnman& connman)
         it++;
 
         // Scan for message start
-        if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), CMessageHeader::MESSAGE_START_SIZE) != 0) {
+        if (!msg.fIsEncryptedPackage && memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), CMessageHeader::MESSAGE_START_SIZE) != 0) {
             LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id);
             fOk = false;
             break;
@@ -6405,24 +6405,26 @@ bool ProcessMessages(CNode* pfrom, CConnman& connman)
 
         // Read header
         CMessageHeader& hdr = msg.hdr;
-        if (!hdr.IsValid(chainparams.MessageStart()))
+        if (!msg.fIsEncryptedPackage && !hdr.IsValid(chainparams.MessageStart()))
         {
             LogPrintf("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
             continue;
         }
-        string strCommand = hdr.GetCommand();
+        string strCommand = (msg.fIsEncryptedPackage ? "" : hdr.GetCommand());
 
         // Message size
         unsigned int nMessageSize = hdr.nMessageSize;
 
         // Checksum
         CDataStream& vRecv = msg.vRecv;
-        const uint256& hash = msg.GetMessageHash();
-        if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0)
+        const uint256* hash = NULL;
+        if (!msg.fIsEncryptedPackage)
+            hash = &msg.GetMessageHash();
+        if (!msg.fIsEncryptedPackage && memcmp(hash->begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0)
         {
             LogPrintf("%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
                SanitizeString(strCommand), nMessageSize,
-               HexStr(hash.begin(), hash.begin()+CMessageHeader::CHECKSUM_SIZE),
+               HexStr(hash->begin(), hash->begin()+CMessageHeader::CHECKSUM_SIZE),
                HexStr(hdr.pchChecksum, hdr.pchChecksum+CMessageHeader::CHECKSUM_SIZE));
             continue;
         }
@@ -6431,8 +6433,21 @@ bool ProcessMessages(CNode* pfrom, CConnman& connman)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, chainparams, connman);
-            boost::this_thread::interruption_point();
+            if (msg.fIsEncryptedPackage)
+            {
+                msg.ForEachSubMessage([&fRet, &pfrom, &msg, &chainparams, &connman](const std::string& strCommand, CDataStream& vRecv, unsigned int nMessageSize)
+                {
+                    bool fSubRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, chainparams, connman);
+                    if (fSubRet && !fRet)
+                        fRet = true;
+                    boost::this_thread::interruption_point();
+                });
+            }
+            else
+            {
+                fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, chainparams, connman);
+                boost::this_thread::interruption_point();
+            }
         }
         catch (const std::ios_base::failure& e)
         {

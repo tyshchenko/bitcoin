@@ -53,6 +53,8 @@ static const unsigned int MAX_INV_SZ = 50000;
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** Maximum length of incoming protocol messages (no message over 4 MB is currently acceptable). */
 static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 4 * 1000 * 1000;
+/** Maximum length of incoming encrypted protocol messages (no message over 10 * MAX_PROTOCOL_MESSAGE_LENGTH is currently acceptable). */
+static const unsigned int MAX_CRYPTED_PROTOCOL_MESSAGE_LENGTH = 10 * MAX_PROTOCOL_MESSAGE_LENGTH;
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 /** Maximum number of outgoing nodes */
@@ -540,7 +542,12 @@ public:
 };
 
 
-
+struct CPureMessage {
+    std::string strCommand;
+    unsigned int nMessageSize;
+    int64_t nTime;
+    CDataStream *pRecv;
+};
 
 class CNetMessage {
 private:
@@ -558,18 +565,25 @@ public:
 
     int64_t nTime;                  // time (in microseconds) of message receipt.
 
-    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn) {
+    bool fIsEncryptedPackage;
+    uint32_t nCipertextSize;
+    bool fMACVerified;
+    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn, bool isEncryptedPackageIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn), fIsEncryptedPackage(isEncryptedPackageIn) {
         hdrbuf.resize(24);
         in_data = false;
         nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
+        nCipertextSize = 0;
+        fMACVerified = false;
     }
 
     bool complete() const
     {
         if (!in_data)
             return false;
+        if (fIsEncryptedPackage && nCipertextSize + 16 == nDataPos)
+            return fMACVerified;
         return (hdr.nMessageSize == nDataPos);
     }
 
@@ -583,6 +597,8 @@ public:
 
     int readHeader(const char *pch, unsigned int nBytes);
     int readData(const char *pch, unsigned int nBytes);
+
+    void ForEachSubMessage(const std::function<void(const std::string& strCommand, CDataStream& vRecv, unsigned int nMessageSize)> func);
 };
 
 
@@ -639,8 +655,9 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     const NodeId id;
-
     const uint64_t nKeyedNetGroup;
+
+    bool fEncrypted; //once set
 protected:
 
     mapMsgCmdSize mapSendBytesPerMsgCmd;
