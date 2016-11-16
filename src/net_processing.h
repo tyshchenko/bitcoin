@@ -74,6 +74,9 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
  */
 void AddPriorityDownload(std::vector<const CBlockIndex*>& blocksToDownload);
 void ProcessPriorityRequests(const std::shared_ptr<CBlock> block);
+bool FlushPriorityDownloads();
+size_t CountPriorityDownloads();
+void ProcessPriorityRequests(const std::shared_ptr<CBlock> block);
 
 void SetAutoRequestBlocks(bool state);
 bool isAutoRequestingBlocks();

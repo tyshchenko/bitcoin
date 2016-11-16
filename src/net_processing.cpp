@@ -3401,6 +3401,19 @@ void ProcessPriorityRequests(const std::shared_ptr<CBlock> blockRef) {
     }
 }
 
+bool FlushPriorityDownloads() {
+    LOCK(cs_main);
+    bool ret = blocksToDownloadFirst.empty();
+    blocksToDownloadFirst.clear();
+    return !ret;
+}
+
+size_t CountPriorityDownloads() {
+    // return a copy
+    LOCK(cs_main);
+    return blocksToDownloadFirst.size();
+}
+
 void SetAutoRequestBlocks(bool state) {
     fAutoRequestBlocks = state;
 }
