@@ -76,6 +76,7 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
 void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
 {
     int confirms = wtx.GetDepthInMainChain();
+    entry.push_back(Pair("validated", wtx.fValidated));
     entry.push_back(Pair("confirmations", confirms));
     if (wtx.IsCoinBase())
         entry.push_back(Pair("generated", true));
@@ -648,7 +649,7 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (const std::pair<uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx, !wtx.fValidated))
             continue;
 
         for (const CTxOut& txout : wtx.tx->vout)
@@ -703,7 +704,7 @@ UniValue getreceivedbyaccount(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (const std::pair<uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx, !wtx.fValidated))
             continue;
 
         for (const CTxOut& txout : wtx.tx->vout)
@@ -1240,7 +1241,7 @@ UniValue ListReceived(CWallet * const pwallet, const UniValue& params, bool fByA
     for (const std::pair<uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
 
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx, -1, wtx.fValidated))
             continue;
 
         int nDepth = wtx.GetDepthInMainChain();
@@ -2526,6 +2527,12 @@ UniValue getwalletinfo(const JSONRPCRequest& request)
     obj.push_back(Pair("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK())));
     if (!masterKeyID.IsNull())
          obj.push_back(Pair("hdmasterkeyid", masterKeyID.GetHex()));
+    const CBlockIndex *pSpvBestBlock = pwallet->GetSPVBestBlock();
+    obj.push_back(Pair("spv_bestblock_height", (int)(pSpvBestBlock ? pSpvBestBlock->nHeight : 0)));
+    obj.push_back(Pair("spv_bestblock_hash", (pSpvBestBlock ? pSpvBestBlock->GetBlockHash().GetHex() : "")));
+    obj.push_back(Pair("spv_headertip_height", (int)(pindexBestHeader ? pindexBestHeader->nHeight: 0)));
+    obj.push_back(Pair("spv_headertip_hash", (pindexBestHeader ? pindexBestHeader->GetBlockHash().GetHex() : "")));
+
     return obj;
 }
 

@@ -189,6 +189,9 @@ public:
     bool WriteBestBlock(const CBlockLocator& locator);
     bool ReadBestBlock(CBlockLocator& locator);
 
+    bool WriteSPVBestBlock(const CBlockLocator& locator);
+    bool ReadSPVBestBlock(CBlockLocator& locator);
+
     bool WriteOrderPosNext(int64_t nOrderPosNext);
 
     bool WriteDefaultKey(const CPubKey& vchPubKey);

@@ -16,6 +16,7 @@
 #include "keystore.h"
 #include "validation.h"
 #include "net.h"
+#include "net_processing.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "policy/rbf.h"
@@ -1147,8 +1148,77 @@ void CWallet::MarkConflicted(const uint256& hashBlock, const uint256& hashTx)
     }
 }
 
+void CWallet::ProcessPriorityRequest(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex *pindex) {
+    if(!IsSPVEnabled() || !pindex) {
+        return;
+    }
+    LOCK2(cs_main, cs_wallet);
+    for (size_t i = 0; i < pblock->vtx.size(); i++) {
+        SyncTransaction(pblock->vtx[i], pindex, i);
+    }
+
+    pSPVBestBlock = pindex;
+
+    // write wallet SPV best block
+    int nStep = 1;
+    std::vector<uint256> vHave;
+    vHave.reserve(32);
+
+    // during SPV, the assumption is, that blocks are processed in order
+    // otherwise, the wallet would need to keep track what block was processed
+    // with the in-order approach, we can just store the wallets spv best block locator
+    const CBlockIndex *pIndexLocator = pSPVBestBlock;
+    while (pIndexLocator) {
+        vHave.push_back(pIndexLocator->GetBlockHash());
+        // Stop when we have added the genesis block.
+        if (pIndexLocator->nHeight == 0)
+            break;
+        // Exponentially larger steps back, plus the genesis block.
+        int nHeight = std::max(pIndexLocator->nHeight - nStep, 0);
+        if (pindexBestHeader->GetAncestor(pIndexLocator->nHeight)) {
+            pIndexLocator = pindexBestHeader->GetAncestor(nHeight);
+        } else {
+            pIndexLocator = pIndexLocator->GetAncestor(nHeight);
+        }
+        if (vHave.size() > 10)
+            nStep *= 2;
+    }
+
+    CWalletDB walletdb(*dbw);
+    walletdb.WriteSPVBestBlock(CBlockLocator(vHave));
+}
+
 void CWallet::UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload)
 {
+    if(!IsSPVEnabled() || !pindexNew) {
+        return;
+    }
+    int64_t blocksRelevantFromTime = GetOldestKeyPoolTime() - 10 * 600;
+
+    if (pindexNew->GetAncestor(pSPVBestBlock->nHeight) != pSPVBestBlock) {
+        // handle a reorg
+        const CBlockIndex *pindexWork = pSPVBestBlock;
+        if (pindexWork != NULL) {
+            if (pindexWork->nHeight > pindexNew->nHeight) {
+                pindexWork = pindexWork->GetAncestor(pindexNew->nHeight);
+            }
+            while (pindexWork && !pindexNew->GetAncestor(pindexWork->nHeight))
+                pindexWork = pindexWork->pprev;
+
+            pSPVBestBlock = pindexWork;
+        }
+    }
+
+    std::vector<const CBlockIndex*> blocksToDownload;
+    const CBlockIndex *pindexWork = pindexNew;
+    while (pindexWork && pindexWork != pSPVBestBlock && pindexWork->GetBlockTime() > blocksRelevantFromTime) {
+        blocksToDownload.push_back(pindexWork);
+        pindexWork = pindexWork->pprev;
+    }
+
+    std::reverse(blocksToDownload.begin(),blocksToDownload.end());
+    FlushPriorityDownloads();
+    AddPriorityDownload(blocksToDownload);
 
 }
 
@@ -1156,7 +1226,7 @@ void CWallet::SyncTransaction(const CTransactionRef& ptx, const CBlockIndex *pin
     const CTransaction& tx = *ptx;
 
     // mark transaction as validated if the related block is valid
-    bool validated = (pindex && ((pindex->nStatus & BLOCK_VALID_MASK) == BLOCK_VALID_MASK));
+    bool validated = (pindex && ((pindex->nStatus & BLOCK_VALID_SCRIPTS) == BLOCK_VALID_SCRIPTS));
 
     if (!AddToWalletIfInvolvingMe(ptx, pindex, posInBlock, true, validated))
         return; // Not one of ours
@@ -1636,7 +1706,7 @@ bool CWalletTx::RelayWalletTransaction(CConnman* connman)
     {
         CValidationState state;
         /* GetDepthInMainChain already catches known conflicts. */
-        if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
+        if (InMempool() || AcceptToMemoryPool(maxTxFee, state) || !fValidated) {
             LogPrintf("Relaying wtx %s\n", GetHash().ToString());
             if (connman) {
                 CInv inv(MSG_TX, GetHash());
@@ -1832,7 +1902,7 @@ bool CWalletTx::InMempool() const
 bool CWalletTx::IsTrusted() const
 {
     // Quick answer in most cases
-    if (!CheckFinalTx(*this))
+    if (!CheckFinalTx(*this, -1, !fValidated))
         return false;
     int nDepth = GetDepthInMainChain();
     if (nDepth >= 1)
@@ -1951,7 +2021,7 @@ CAmount CWallet::GetUnconfirmedBalance() const
         for (std::map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 && pcoin->InMempool())
+            if (!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 && (!pcoin->fValidated || pcoin->InMempool()))
                 nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -2031,7 +2101,7 @@ CAmount CWallet::GetLegacyBalance(const isminefilter& filter, int minDepth, cons
     for (const auto& entry : mapWallet) {
         const CWalletTx& wtx = entry.second;
         const int depth = wtx.GetDepthInMainChain();
-        if (depth < 0 || !CheckFinalTx(*wtx.tx) || wtx.GetBlocksToMaturity() > 0) {
+        if (depth < 0 || !CheckFinalTx(*wtx.tx, -1, !wtx.fValidated) || wtx.GetBlocksToMaturity() > 0) {
             continue;
         }
 
@@ -2089,7 +2159,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe, const
             const uint256& wtxid = it->first;
             const CWalletTx* pcoin = &(*it).second;
 
-            if (!CheckFinalTx(*pcoin))
+            if (!CheckFinalTx(*pcoin, -1, !pcoin->fValidated))
                 continue;
 
             if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
@@ -2939,7 +3009,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, CCon
         if (fBroadcastTransactions)
         {
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(maxTxFee, state)) {
+            if (wtxNew.fValidated && !wtxNew.AcceptToMemoryPool(maxTxFee, state)) {
                 LogPrintf("CommitTransaction(): Transaction cannot be broadcast immediately, %s\n", state.GetRejectReason());
                 // TODO: if we expect the failure to be long term or permanent, instead delete wtx from the wallet and return failure.
             } else {
@@ -3855,6 +3925,7 @@ std::string CWallet::GetWalletHelpString(bool showDebug)
     strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions on startup"));
     strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet on startup"));
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE));
+    strUsage += HelpMessageOpt("-spv", strprintf(_("Use simple payment verification (default: %u)"), DEFAULT_USE_SPV));
     strUsage += HelpMessageOpt("-txconfirmtarget=<n>", strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), DEFAULT_TX_CONFIRM_TARGET));
     strUsage += HelpMessageOpt("-usehd", _("Use hierarchical deterministic key generation (HD) after BIP32. Only has effect during wallet creation/first start") + " " + strprintf(_("(default: %u)"), DEFAULT_USE_HD_WALLET));
     strUsage += HelpMessageOpt("-walletrbf", strprintf(_("Send transactions with full-RBF opt-in enabled (default: %u)"), DEFAULT_WALLET_RBF));
@@ -4057,6 +4128,31 @@ CWallet* CWallet::CreateWalletFromFile(const std::string walletFile)
         }
     }
     walletInstance->SetBroadcastTransactions(GetBoolArg("-walletbroadcast", DEFAULT_WALLETBROADCAST));
+    walletInstance->SetSPV(GetBoolArg("-spv", DEFAULT_USE_SPV));
+
+    CWalletDB walletdb(*walletInstance->dbw);
+    CBlockLocator spvLocator;
+    if (walletdb.ReadSPVBestBlock(spvLocator)) {
+        // Find the first block the caller has in the main chain
+        for (const uint256& hash : spvLocator.vHave) {
+            BlockMap::iterator mi = mapBlockIndex.find(hash);
+            if (mi != mapBlockIndex.end())
+            {
+                CBlockIndex* pindex = (*mi).second;
+                if (pindexBestHeader->GetAncestor(pindex->nHeight)) {
+                    walletInstance->pSPVBestBlock = pindex;
+                    break;
+                }
+                if (pindex->GetAncestor(pindexBestHeader->nHeight) == pindexBestHeader) {
+                    walletInstance->pSPVBestBlock = pindexBestHeader;
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        walletInstance->pSPVBestBlock = pindexBestHeader ? pindexBestHeader->GetAncestor(0) : nullptr;
+    }
 
     {
         LOCK(walletInstance->cs_wallet);
@@ -4265,11 +4361,17 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex* &pindexRet) const
     if (mi == mapBlockIndex.end())
         return 0;
     CBlockIndex* pindex = (*mi).second;
-    if (!pindex || !chainActive.Contains(pindex))
+    // return 0 (== mempool) if the related block in not in the main chain
+    // OR – in case of not yet validated transaction – if the related block is not an ancestor of the best-header
+    if ( ( fValidated && (!pindex || !chainActive.Contains(pindex)) )
+         ||
+         ( !fValidated && (!pindexBestHeader->GetAncestor(pindex->nHeight)))
+        ) {
         return 0;
+    }
 
     pindexRet = pindex;
-    return ((nIndex == -1) ? (-1) : 1) * (chainActive.Height() - pindex->nHeight + 1);
+    return ((nIndex == -1) ? (-1) : 1) * ( (fValidated ? chainActive.Height() : pindexBestHeader->nHeight) - pindex->nHeight + 1);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const

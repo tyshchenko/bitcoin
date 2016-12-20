@@ -68,6 +68,8 @@ static const bool DEFAULT_DISABLE_WALLET = false;
 //! if set, all keys will be derived by using BIP32
 static const bool DEFAULT_USE_HD_WALLET = true;
 
+static const bool DEFAULT_USE_SPV = false;
+
 extern const char * DEFAULT_WALLET_DAT;
 
 static const int64_t TIMESTAMP_MIN = 0;
@@ -683,6 +685,9 @@ private:
     int64_t nLastResend;
     bool fBroadcastTransactions;
 
+    //! whether the wallet uses simpel payment verification
+    std::atomic<bool> fSPV;
+
     /**
      * Used to keep track of spent outpoints, and
      * detect and report conflicts (double-spends or
@@ -713,6 +718,9 @@ private:
     int64_t m_max_keypool_index;
 
     int64_t nTimeFirstKey;
+
+    //! wallet did SPV scan up to this block
+    const CBlockIndex *pSPVBestBlock;
 
     /**
      * Private version of AddWatchOnly method which does not accept a
@@ -941,6 +949,7 @@ public:
     void BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex *pindex, const std::vector<CTransactionRef>& vtxConflicted) override;
     void UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload) override;
     void BlockDisconnected(const std::shared_ptr<const CBlock>& pblock) override;
+    void ProcessPriorityRequest(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex *pindex) override;
     bool AddToWalletIfInvolvingMe(const CTransactionRef& tx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate, bool fValidated);
     int64_t RescanFromTime(int64_t startTime, bool update);
     CBlockIndex* ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
@@ -1149,6 +1158,12 @@ public:
        caller must ensure the current wallet version is correct before calling
        this function). */
     bool SetHDMasterKey(const CPubKey& key);
+
+    /** Inquire whether this wallet does simple payment verification. */
+    bool IsSPVEnabled() const { return fSPV; }
+    /** Set whether this wallet uses simple payment verification. */
+    void SetSPV(bool state) { fSPV = state; }
+    const CBlockIndex * GetSPVBestBlock() { return pSPVBestBlock; }
 };
 
 /** A key allocated from the key pool. */

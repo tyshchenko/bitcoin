@@ -260,6 +260,7 @@ bool CFeeBumper::commit(CWallet *pWallet)
     wtxBumped.mapValue["replaces_txid"] = oldWtx.GetHash().ToString();
     wtxBumped.vOrderForm = oldWtx.vOrderForm;
     wtxBumped.strFromAccount = oldWtx.strFromAccount;
+    wtxBumped.fValidated = oldWtx.fValidated;
     wtxBumped.fTimeReceivedIsTxTime = true;
     wtxBumped.fFromMe = true;
     CValidationState state;

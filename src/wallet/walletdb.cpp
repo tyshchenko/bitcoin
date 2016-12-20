@@ -125,6 +125,18 @@ bool CWalletDB::ReadBestBlock(CBlockLocator& locator)
     return batch.Read(std::string("bestblock_nomerkle"), locator);
 }
 
+bool CWalletDB::WriteSPVBestBlock(const CBlockLocator& locator)
+{
+    WriteIC(std::string("spvbestblock"), CBlockLocator()); // Write empty block locator so versions that require a merkle branch automatically rescan
+    return WriteIC(std::string("spvbestblock"), locator);
+}
+
+bool CWalletDB::ReadSPVBestBlock(CBlockLocator& locator)
+{
+    if (batch.Read(std::string("spvbestblock"), locator) && !locator.vHave.empty()) return true;
+    return batch.Read(std::string("spvbestblock"), locator);
+}
+
 bool CWalletDB::WriteOrderPosNext(int64_t nOrderPosNext)
 {
     return WriteIC(std::string("orderposnext"), nOrderPosNext);
