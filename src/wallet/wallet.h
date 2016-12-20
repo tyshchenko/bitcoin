@@ -929,6 +929,7 @@ public:
     void MarkDirty();
     bool AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose=true);
     bool LoadToWallet(const CWalletTx& wtxIn);
+    void FindTransaction(const uint256 &hash, CTransactionRef &txsp) override;
     void TransactionAddedToMempool(const CTransactionRef& tx) override;
     void BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex *pindex, const std::vector<CTransactionRef>& vtxConflicted) override;
     void UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload) override;

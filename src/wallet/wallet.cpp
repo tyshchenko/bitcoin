@@ -1162,6 +1162,15 @@ void CWallet::SyncTransaction(const CTransactionRef& ptx, const CBlockIndex *pin
     }
 }
 
+void CWallet::FindTransaction(const uint256 &hash, CTransactionRef &txsp)
+{
+    auto mi = mapWallet.find(hash);
+    if (mi != mapWallet.end())
+    {
+        txsp = MakeTransactionRef(mi->second);
+    }
+}
+
 void CWallet::TransactionAddedToMempool(const CTransactionRef& ptx) {
     LOCK2(cs_main, cs_wallet);
     SyncTransaction(ptx);
@@ -1192,8 +1201,6 @@ void CWallet::BlockDisconnected(const std::shared_ptr<const CBlock>& pblock) {
         SyncTransaction(ptx);
     }
 }
-
-
 
 isminetype CWallet::IsMine(const CTxIn &txin) const
 {

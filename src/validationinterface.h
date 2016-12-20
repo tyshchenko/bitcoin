@@ -38,6 +38,8 @@ protected:
     virtual void UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload) {}
     /** Notifies listeners of a transaction having been added to mempool. */
     virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
+    /** Notifies listeners that the signal emitter needs a particular transaction. */
+    virtual void FindTransaction(const uint256 &hash, CTransactionRef &txRef) {}
     /**
      * Notifies listeners of a block being connected.
      * Provides a vector of transactions evicted from the mempool as a result.
@@ -91,6 +93,7 @@ public:
     void UpdatedBlockTip(const CBlockIndex *, const CBlockIndex *, bool fInitialDownload);
     void UpdatedBlockHeaderTip(const CBlockIndex *, bool fInitialDownload);
     void TransactionAddedToMempool(const CTransactionRef &);
+    void FindTransaction(const uint256 &, CTransactionRef &);
     void BlockConnected(const std::shared_ptr<const CBlock> &, const CBlockIndex *pindex, const std::vector<CTransactionRef> &);
     void BlockDisconnected(const std::shared_ptr<const CBlock> &);
     void SetBestChain(const CBlockLocator &);

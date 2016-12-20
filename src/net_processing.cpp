@@ -3182,15 +3182,17 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     if (pto->filterInventoryKnown.contains(hash)) {
                         continue;
                     }
-                    // Not in the mempool anymore? don't bother sending it.
+                    /* Not in the mempool? Try to find it via emitting the FindTransaction signal
+                     * This is when no mempool (and no UTXO set) is present but wtx relay is required (SPV mode) */
                     auto txinfo = mempool.info(hash);
-                    if (!txinfo.tx) {
-                        continue;
+                    CTransactionRef txsp = txinfo.tx;
+                    if (!txsp) {
+                        GetMainSignals().FindTransaction(hash, txsp);
                     }
-                    if (filterrate && txinfo.feeRate.GetFeePerK() < filterrate) {
-                        continue;
-                    }
-                    if (pto->pfilter && !pto->pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
+                    if (!txsp) continue;
+
+                    if (filterrate && txinfo.tx && txinfo.feeRate.GetFeePerK() < filterrate) continue;
+                    if (pto->pfilter && !pto->pfilter->IsRelevantAndUpdate(*txsp)) continue;
                     // Send
                     vInv.push_back(CInv(MSG_TX, hash));
                     nRelayedTransactions++;
@@ -3202,7 +3204,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                             vRelayExpiration.pop_front();
                         }
 
-                        auto ret = mapRelay.insert(std::make_pair(hash, std::move(txinfo.tx)));
+                        auto ret = mapRelay.insert(std::make_pair(hash, std::move(txsp)));
                         if (ret.second) {
                             vRelayExpiration.push_back(std::make_pair(nNow + 15 * 60 * 1000000, ret.first));
                         }
