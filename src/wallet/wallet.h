@@ -201,6 +201,7 @@ public:
      * compatibility.
      */
     int nIndex;
+    bool fValidated;
 
     CMerkleTx()
     {
@@ -379,6 +380,7 @@ public:
         nImmatureWatchCreditCached = 0;
         nChangeCached = 0;
         nOrderPos = -1;
+        fValidated = false;
     }
 
     ADD_SERIALIZE_METHODS;
@@ -397,6 +399,9 @@ public:
 
             if (nTimeSmart)
                 mapValue["timesmart"] = strprintf("%u", nTimeSmart);
+
+            if (fValidated)
+                mapValue["validated"] = "yes";
         }
 
         READWRITE(*(CMerkleTx*)this);
@@ -416,12 +421,14 @@ public:
             ReadOrderPos(nOrderPos, mapValue);
 
             nTimeSmart = mapValue.count("timesmart") ? (unsigned int)atoi64(mapValue["timesmart"]) : 0;
+            fValidated = (mapValue.count("validated") && mapValue["validated"] == "yes") ? true : false;
         }
 
         mapValue.erase("fromaccount");
         mapValue.erase("spent");
         mapValue.erase("n");
         mapValue.erase("timesmart");
+        mapValue.erase("validated");
     }
 
     //! make sure balances are recalculated
@@ -934,7 +941,7 @@ public:
     void BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex *pindex, const std::vector<CTransactionRef>& vtxConflicted) override;
     void UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload) override;
     void BlockDisconnected(const std::shared_ptr<const CBlock>& pblock) override;
-    bool AddToWalletIfInvolvingMe(const CTransactionRef& tx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate);
+    bool AddToWalletIfInvolvingMe(const CTransactionRef& tx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate, bool fValidated);
     int64_t RescanFromTime(int64_t startTime, bool update);
     CBlockIndex* ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();

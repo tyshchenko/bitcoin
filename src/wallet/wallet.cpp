@@ -921,6 +921,12 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
             wtx.fFromMe = wtxIn.fFromMe;
             fUpdated = true;
         }
+        // If validation state has changed, update
+        if (wtxIn.fValidated != wtx.fValidated)
+        {
+             wtx.fValidated = wtxIn.fValidated;
+             fUpdated = true;
+        }
     }
 
     //// debug print
@@ -983,7 +989,7 @@ bool CWallet::LoadToWallet(const CWalletTx& wtxIn)
  * Abandoned state should probably be more carefully tracked via different
  * posInBlock signals or by checking mempool presence when necessary.
  */
-bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef& ptx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef& ptx, const CBlockIndex* pIndex, int posInBlock, bool fUpdate, bool fValidated)
 {
     const CTransaction& tx = *ptx;
     {
@@ -1007,7 +1013,7 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef& ptx, const CBlockI
         if (fExisted || IsMine(tx) || IsFromMe(tx))
         {
             CWalletTx wtx(this, ptx);
-
+            wtx.fValidated = fValidated;
             // Get merkle branch if transaction was found in a block
             if (pIndex != NULL)
                 wtx.SetMerkleBranch(pIndex, posInBlock);
@@ -1149,7 +1155,10 @@ void CWallet::UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialD
 void CWallet::SyncTransaction(const CTransactionRef& ptx, const CBlockIndex *pindex, int posInBlock) {
     const CTransaction& tx = *ptx;
 
-    if (!AddToWalletIfInvolvingMe(ptx, pindex, posInBlock, true))
+    // mark transaction as validated if the related block is valid
+    bool validated = (pindex && ((pindex->nStatus & BLOCK_VALID_MASK) == BLOCK_VALID_MASK));
+
+    if (!AddToWalletIfInvolvingMe(ptx, pindex, posInBlock, true, validated))
         return; // Not one of ours
 
     // If a transaction changes 'conflicted' state, that changes the balance
@@ -1570,7 +1579,7 @@ CBlockIndex* CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool f
             CBlock block;
             if (ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
                 for (size_t posInBlock = 0; posInBlock < block.vtx.size(); ++posInBlock) {
-                    AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex, posInBlock, fUpdate);
+                    AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex, posInBlock, fUpdate, true);
                 }
             } else {
                 ret = pindex;
