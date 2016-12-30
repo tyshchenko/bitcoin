@@ -32,6 +32,7 @@ void UnregisterAllValidationInterfaces();
 class CValidationInterface {
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload) {}
+    virtual void UpdatedBlockHeaderTip(bool fInitialDownload, const CBlockIndex *pindexNew) {}
     virtual void SyncTransaction(const CTransaction &tx, const CBlockIndex *pindex, int posInBlock, bool validated = true) {}
     virtual void GetNonMempoolTransaction(const uint256 &hash,  std::shared_ptr<const CTransaction> &txsp) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
@@ -69,6 +70,8 @@ struct CMainSignals {
     boost::signals2::signal<void (boost::shared_ptr<CReserveScript>&)> ScriptForMining;
     /** Notifies listeners that a block has been successfully mined */
     boost::signals2::signal<void (const uint256 &)> BlockFound;
+    /** Best header has changed */
+    boost::signals2::signal<void (bool, const CBlockIndex *)> UpdatedBlockHeaderTip;
 };
 
 CMainSignals& GetMainSignals();

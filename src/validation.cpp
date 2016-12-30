@@ -2385,6 +2385,7 @@ static void NotifyHeaderTip() {
     // Send block tip changed notifications without cs_main
     if (fNotify) {
         uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
+        GetMainSignals().UpdatedBlockHeaderTip(fInitialBlockDownload, pindexHeader);
     }
 }
 
