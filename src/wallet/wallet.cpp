@@ -1141,6 +1141,11 @@ void CWallet::MarkConflicted(const uint256& hashBlock, const uint256& hashTx)
     }
 }
 
+void CWallet::UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload)
+{
+
+}
+
 void CWallet::SyncTransaction(const CTransactionRef& ptx, const CBlockIndex *pindex, int posInBlock) {
     const CTransaction& tx = *ptx;
 

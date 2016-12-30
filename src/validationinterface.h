@@ -34,6 +34,8 @@ class CValidationInterface {
 protected:
     /** Notifies listeners of updated block chain tip */
     virtual void UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload) {}
+    /** Notifies listeners of updated best header (headers chain tip) */
+    virtual void UpdatedBlockHeaderTip(const CBlockIndex *pindexNew, bool fInitialDownload) {}
     /** Notifies listeners of a transaction having been added to mempool. */
     virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
     /**
@@ -87,6 +89,7 @@ public:
     void FlushBackgroundCallbacks();
 
     void UpdatedBlockTip(const CBlockIndex *, const CBlockIndex *, bool fInitialDownload);
+    void UpdatedBlockHeaderTip(const CBlockIndex *, bool fInitialDownload);
     void TransactionAddedToMempool(const CTransactionRef &);
     void BlockConnected(const std::shared_ptr<const CBlock> &, const CBlockIndex *pindex, const std::vector<CTransactionRef> &);
     void BlockDisconnected(const std::shared_ptr<const CBlock> &);
