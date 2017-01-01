@@ -64,7 +64,7 @@ void CAuxiliaryBlockRequest::processWithPossibleBlock(const std::shared_ptr<cons
                 this->cancel();
 
         // release global block request pointer if request has been completed
-        if (this->processedUpToSize == this->vBlocksToDownload.size())
+        if (currentBlockRequest == shared_from_this() && isCompleted())
             currentBlockRequest = nullptr;
 
         if (i-this->processedUpToSize >= MAX_BLOCK_TO_PROCESS_PER_ITERATION)
@@ -121,6 +121,11 @@ unsigned int CAuxiliaryBlockRequest::amountOfBlocksLoaded()
             haveData++;
     }
     return haveData;
+}
+
+bool CAuxiliaryBlockRequest::isCompleted()
+{
+    return (this->processedUpToSize == this->vBlocksToDownload.size());
 }
 
 std::shared_ptr<CAuxiliaryBlockRequest> CAuxiliaryBlockRequest::GetCurrentRequest()
