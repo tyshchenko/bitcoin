@@ -2292,6 +2292,8 @@ UniValue getwalletinfo(const JSONRPCRequest& request)
             "  \"unlocked_until\": ttt,        (numeric) the timestamp in seconds since epoch (midnight Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
             "  \"paytxfee\": x.xxxx,           (numeric) the transaction fee configuration, set in " + CURRENCY_UNIT + "/kB\n"
             "  \"hdmasterkeyid\": \"<hash160>\", (string) the Hash160 of the HD master pubkey\n"
+            "  \"nvs_bestblock_height\": x,  (numeric) the height of the latest SPV scanned block\n"
+            "  \"nvs_bestblock_hash\": x,    (string) the hash of the latest SPV scanned block\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getwalletinfo", "")
@@ -2314,6 +2316,8 @@ UniValue getwalletinfo(const JSONRPCRequest& request)
     CKeyID masterKeyID = pwalletMain->GetHDChain().masterKeyID;
     if (!masterKeyID.IsNull())
          obj.push_back(Pair("hdmasterkeyid", masterKeyID.GetHex()));
+    obj.push_back(Pair("nvs_bestblock_height",   (int)(pwalletMain->pNVSBestBlock ? pwalletMain->pNVSBestBlock->nHeight : 0)));
+    obj.push_back(Pair("nvs_bestblock_hash",   (pwalletMain->pNVSBestBlock ? pwalletMain->pNVSBestBlock->GetBlockHash().GetHex() : "")));
     return obj;
 }
 

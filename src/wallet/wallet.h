@@ -664,7 +664,8 @@ public:
         nLastResend = 0;
         nTimeFirstKey = 0;
         fBroadcastTransactions = false;
-        pLastKnownBestHeader = NULL;
+        pNVSLastKnownBestHeader = NULL;
+        pNVSBestBlock = NULL;
     }
 
     std::map<uint256, CWalletTx> mapWallet;
@@ -686,7 +687,9 @@ public:
     int64_t nTimeFirstKey;
 
     //! last known best header, required to check for forks
-    CBlockIndex *pLastKnownBestHeader;
+    CBlockIndex *pNVSLastKnownBestHeader;
+    //! wallet did non-validation scan up to this block
+    CBlockIndex *pNVSBestBlock;
 
     const CWalletTx* GetWalletTx(const uint256& hash) const;
 
@@ -944,6 +947,7 @@ public:
     /* Wallets parameter interaction */
     static bool ParameterInteraction();
 
+    void RequestNonValidationScan(int64_t optional_timestamp = 0);
     bool BackupWallet(const std::string& strDest);
 
     /* Set the HD chain model (chain child index counters) */
