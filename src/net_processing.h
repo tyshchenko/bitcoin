@@ -27,6 +27,9 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals);
 /** Unregister a network node */
 void UnregisterNodeSignals(CNodeSignals& nodeSignals);
 
+/** if disabled, blocks will not be requested automatically, useful for low-resources-available mode */
+static const bool DEFAULT_AUTOMATIC_BLOCK_REQUESTS = true;
+
 class PeerLogicValidation : public CValidationInterface {
 private:
     CConnman* connman;
@@ -71,5 +74,8 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
  */
 void AddPriorityDownload(std::vector<const CBlockIndex*>& blocksToDownload);
 void ProcessPriorityRequests(const std::shared_ptr<CBlock> block);
+
+void SetAutoRequestBlocks(bool state);
+bool isAutoRequestingBlocks();
 
 #endif // BITCOIN_NET_PROCESSING_H

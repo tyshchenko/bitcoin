@@ -61,6 +61,8 @@ static std::vector<std::pair<uint256, CTransactionRef>> vExtraTxnForCompact GUAR
 
 static const uint64_t RANDOMIZER_ID_ADDRESS_RELAY = 0x3cac0035b5866b90ULL; // SHA256("main address relay")[0:8]
 
+static std::atomic<bool> fAutoRequestBlocks(DEFAULT_AUTOMATIC_BLOCK_REQUESTS);
+
 // Internal stuff
 namespace {
     /** Number of nodes with fSyncStarted. */
@@ -500,6 +502,10 @@ bool FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
             }
         }
         return true;
+    }
+
+    if (!fAutoRequestBlocks) {
+        return false;
     }
 
     if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork || state->pindexBestKnownBlock->nChainWork < UintToArith256(consensusParams.nMinimumChainWork)) {
@@ -2375,6 +2381,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         pindexLast->nHeight);
             } else {
                 std::vector<CInv> vGetData;
+                // Do not request blocks if autorequest is disabled
+                if (!fAutoRequestBlocks) {
+                    return true;
+                }
                 // Download as much as possible, from earliest to latest.
                 for (const CBlockIndex *pindex : reverse_iterate(vToFetch)) {
                     if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
@@ -3389,6 +3399,14 @@ void ProcessPriorityRequests(const std::shared_ptr<CBlock> blockRef) {
                                         return rB.pindex == r.pindex;
                                     }), blocksToDownloadFirst.end());
     }
+}
+
+void SetAutoRequestBlocks(bool state) {
+    fAutoRequestBlocks = state;
+}
+
+bool isAutoRequestingBlocks() {
+    return fAutoRequestBlocks;
 }
 
 class CNetProcessingCleanup
