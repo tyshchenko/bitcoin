@@ -468,10 +468,11 @@ public:
     int nDepth;
     bool fSpendable;
     bool fSolvable;
+    isminefilter isminetype;
 
-    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn, bool fSolvableIn)
+    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn, bool fSolvableIn, isminefilter isminetypeIn)
     {
-        tx = txIn; i = iIn; nDepth = nDepthIn; fSpendable = fSpendableIn; fSolvable = fSolvableIn;
+        tx = txIn; i = iIn; nDepth = nDepthIn; fSpendable = fSpendableIn; fSolvable = fSolvableIn, isminetype = isminetypeIn;
     }
 
     std::string ToString() const;
