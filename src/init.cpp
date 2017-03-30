@@ -125,14 +125,23 @@ static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
 
 std::atomic<bool> fRequestShutdown(false);
 std::atomic<bool> fDumpMempoolLater(false);
+static std::mutex mutexShutdownWait;
+static std::condition_variable cvShutdownWait;
 
 void StartShutdown()
 {
     fRequestShutdown = true;
+    std::unique_lock<std::mutex> lockShutdownWait(mutexShutdownWait);
+    cvShutdownWait.notify_all();
 }
 bool ShutdownRequested()
 {
     return fRequestShutdown;
+}
+
+void WaitForShutdownRequested() {
+    std::unique_lock<std::mutex> lockShutdownWait(mutexShutdownWait);
+    cvShutdownWait.wait(lockShutdownWait, []() { return ShutdownRequested(); });
 }
 
 /**
