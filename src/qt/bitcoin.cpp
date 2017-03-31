@@ -239,7 +239,6 @@ private:
     OptionsModel *optionsModel;
     ClientModel *clientModel;
     BitcoinGUI *window;
-    QTimer *pollShutdownTimer;
 #ifdef ENABLE_WALLET
     PaymentServer* paymentServer;
     WalletModel *walletModel;
@@ -316,7 +315,6 @@ BitcoinApplication::BitcoinApplication(int &argc, char **argv):
     optionsModel(0),
     clientModel(0),
     window(0),
-    pollShutdownTimer(0),
 #ifdef ENABLE_WALLET
     paymentServer(0),
     walletModel(0),
@@ -373,10 +371,6 @@ void BitcoinApplication::createOptionsModel(bool resetSettings)
 void BitcoinApplication::createWindow(const NetworkStyle *networkStyle)
 {
     window = new BitcoinGUI(platformStyle, networkStyle, 0);
-
-    pollShutdownTimer = new QTimer(window);
-    connect(pollShutdownTimer, SIGNAL(timeout()), window, SLOT(detectShutdown()));
-    pollShutdownTimer->start(200);
 }
 
 void BitcoinApplication::createSplashScreen(const NetworkStyle *networkStyle)
@@ -434,7 +428,6 @@ void BitcoinApplication::requestShutdown()
     startThread();
     window->hide();
     window->setClientModel(0);
-    pollShutdownTimer->stop();
 
 #ifdef ENABLE_WALLET
     window->removeAllWallets();

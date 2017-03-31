@@ -107,6 +107,9 @@ public:
 
     /** Banlist did change. */
     boost::signals2::signal<void (void)> BannedListChanged;
+
+    /** A shutdown has been requested. */
+    boost::signals2::signal<void (void)> ShutdownRequested;
 };
 
 /** Show warning message **/

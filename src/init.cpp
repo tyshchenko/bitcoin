@@ -281,6 +281,7 @@ void Shutdown()
 static void HandleSIGTERM(int)
 {
     fRequestShutdown = true;
+    uiInterface.ShutdownRequested();
 }
 
 static void HandleSIGHUP(int)

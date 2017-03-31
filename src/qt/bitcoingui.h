@@ -191,6 +191,9 @@ public Q_SLOTS:
     void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label);
 #endif // ENABLE_WALLET
 
+    /** shutdown the GUI **/
+    void shutdownGUI();
+
 private Q_SLOTS:
 #ifdef ENABLE_WALLET
     /** Switch to overview (home) page */
@@ -229,9 +232,6 @@ private Q_SLOTS:
     void showNormalIfMinimized(bool fToggleHidden = false);
     /** Simply calls showNormalIfMinimized(true) for use in SLOT() macro */
     void toggleHidden();
-
-    /** called by a timer to check if fRequestShutdown has been set **/
-    void detectShutdown();
 
     /** Show progress dialog e.g. for verifychain */
     void showProgress(const QString &title, int nProgress);

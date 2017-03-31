@@ -1109,14 +1109,11 @@ void BitcoinGUI::toggleHidden()
     showNormalIfMinimized(true);
 }
 
-void BitcoinGUI::detectShutdown()
+void BitcoinGUI::shutdownGUI()
 {
-    if (ShutdownRequested())
-    {
-        if(rpcConsole)
-            rpcConsole->hide();
-        qApp->quit();
-    }
+    if(rpcConsole)
+        rpcConsole->hide();
+    qApp->quit();
 }
 
 void BitcoinGUI::showProgress(const QString &title, int nProgress)
@@ -1178,6 +1175,7 @@ void BitcoinGUI::subscribeToCoreSignals()
     // Connect signals to client
     uiInterface.ThreadSafeMessageBox.connect(boost::bind(ThreadSafeMessageBox, this, _1, _2, _3));
     uiInterface.ThreadSafeQuestion.connect(boost::bind(ThreadSafeMessageBox, this, _1, _3, _4));
+    uiInterface.ShutdownRequested.connect(boost::bind(&BitcoinGUI::shutdownGUI, this));
 }
 
 void BitcoinGUI::unsubscribeFromCoreSignals()
@@ -1185,6 +1183,7 @@ void BitcoinGUI::unsubscribeFromCoreSignals()
     // Disconnect signals from client
     uiInterface.ThreadSafeMessageBox.disconnect(boost::bind(ThreadSafeMessageBox, this, _1, _2, _3));
     uiInterface.ThreadSafeQuestion.disconnect(boost::bind(ThreadSafeMessageBox, this, _1, _3, _4));
+    uiInterface.ShutdownRequested.disconnect(boost::bind(&BitcoinGUI::shutdownGUI, this));
 }
 
 void BitcoinGUI::toggleNetworkActive()
