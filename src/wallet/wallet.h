@@ -1109,8 +1109,7 @@ public:
        this function). */
     bool SetHDMasterKey(const CPubKey& key);
 
-    bool IsSyncPausedUntilKeypoolExt() { return fSyncPausedUntilKeypoolExt; }
-    void SetSyncPausedUntilKeypoolExt(bool state) { fSyncPausedUntilKeypoolExt = state; }
+    void EventuallyRescanAfterKeypoolTopUp();
 };
 
 /** A key allocated from the key pool. */
