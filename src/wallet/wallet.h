@@ -652,6 +652,7 @@ private:
     static std::atomic<bool> fFlushScheduled;
     std::atomic<bool> fAbortRescan;
     std::atomic<bool> fScanningWallet;
+    std::atomic<bool> fSyncPausedUntilKeypoolExt;
 
     /**
      * Select a set of coins such that nValueRet >= nTargetValue and at least
@@ -792,6 +793,7 @@ public:
         nRelockTime = 0;
         fAbortRescan = false;
         fScanningWallet = false;
+        fSyncPausedUntilKeypoolExt = false;
     }
 
     std::map<uint256, CWalletTx> mapWallet;
@@ -1106,6 +1108,9 @@ public:
        caller must ensure the current wallet version is correct before calling
        this function). */
     bool SetHDMasterKey(const CPubKey& key);
+
+    bool IsSyncPausedUntilKeypoolExt() { return fSyncPausedUntilKeypoolExt; }
+    void SetSyncPausedUntilKeypoolExt(bool state) { fSyncPausedUntilKeypoolExt = state; }
 };
 
 /** A key allocated from the key pool. */
