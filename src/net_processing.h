@@ -64,4 +64,11 @@ bool ProcessMessages(CNode* pfrom, CConnman& connman, const std::atomic<bool>& i
  */
 bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interrupt);
 
+/**
+ * Prioritize a block for downloading
+ * Blocks requested with priority will be downloaded and processed first
+ * Downloaded blocks will not trigger ActivateBestChain
+ */
+void AddPriorityDownload(std::vector<const CBlockIndex*>& blocksToDownload);
+
 #endif // BITCOIN_NET_PROCESSING_H

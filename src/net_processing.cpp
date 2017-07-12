@@ -104,6 +104,7 @@ namespace {
         const CBlockIndex* pindex;                               //!< Optional.
         bool fValidatedHeaders;                                  //!< Whether this block has validated headers at the time of request.
         std::unique_ptr<PartiallyDownloadedBlock> partialBlock;  //!< Optional, used for CMPCTBLOCK downloads
+        bool priorityRequest;                                    //!< Whether its a priority download
     };
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
 
@@ -121,6 +122,13 @@ namespace {
     MapRelay mapRelay;
     /** Expiration-time ordered list of (expire time, relay map entry) pairs, protected by cs_main). */
     std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
+
+    struct PriorityBlockRequest {
+        const CBlockIndex* pindex;
+        bool downloaded;
+    };
+
+    std::vector<PriorityBlockRequest> blocksToDownloadFirst;
 } // namespace
 
 //////////////////////////////////////////////////////////////////////////////
@@ -309,9 +317,13 @@ void FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
 }
 
 // Requires cs_main.
-// Returns a bool indicating whether we requested this block.
+// Returns a MarkBlockAsReceivedResult struct to indicating whether we requested this block and if it was via the priority request queue
 // Also used if a block was /not/ received and timed out or started with another peer
-bool MarkBlockAsReceived(const uint256& hash) {
+struct MarkBlockAsReceivedResult {
+    bool fRequested;
+    bool fPriorityRequest;
+ };
+const MarkBlockAsReceivedResult MarkBlockAsReceived(const uint256& hash) {
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight = mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end()) {
         CNodeState *state = State(itInFlight->second.first);
@@ -324,19 +336,28 @@ bool MarkBlockAsReceived(const uint256& hash) {
             // First block on the queue was received, update the start download time for the next one
             state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
         }
-        state->vBlocksInFlight.erase(itInFlight->second.second);
+        bool priorityRequest = itInFlight->second.second->priorityRequest;
         state->nBlocksInFlight--;
         state->nStallingSince = 0;
+        if (priorityRequest) {
+            // mark as downloaded
+            auto it = std::find_if(blocksToDownloadFirst.begin(), blocksToDownloadFirst.end(),  [&itInFlight](const PriorityBlockRequest &r) { return r.pindex == itInFlight->second.second->pindex; });
+            if (it != blocksToDownloadFirst.end()) {
+                (*it).downloaded = true;
+            }
+        }
+        state->vBlocksInFlight.erase(itInFlight->second.second);
         mapBlocksInFlight.erase(itInFlight);
-        return true;
+
+        return {true, priorityRequest};
     }
-    return false;
+    return {false, false};
 }
 
 // Requires cs_main.
 // returns false, still setting pit, if the block was already in flight from the same peer
 // pit will only be valid as long as the same cs_main lock is being held
-bool MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const CBlockIndex* pindex = NULL, std::list<QueuedBlock>::iterator** pit = NULL) {
+bool MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const CBlockIndex* pindex = NULL, std::list<QueuedBlock>::iterator** pit = NULL, bool priorityRequest = false) {
     CNodeState *state = State(nodeid);
     assert(state != NULL);
 
@@ -353,7 +374,7 @@ bool MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const CBlockIndex* 
     MarkBlockAsReceived(hash);
 
     std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(),
-            {hash, pindex, pindex != NULL, std::unique_ptr<PartiallyDownloadedBlock>(pit ? new PartiallyDownloadedBlock(&mempool) : NULL)});
+            {hash, pindex, pindex != NULL, std::unique_ptr<PartiallyDownloadedBlock>(pit ? new PartiallyDownloadedBlock(&mempool) : NULL), priorityRequest});
     state->nBlocksInFlight++;
     state->nBlocksInFlightValidHeaders += it->fValidatedHeaders;
     if (state->nBlocksInFlight == 1) {
@@ -454,10 +475,12 @@ bool PeerHasHeader(CNodeState *state, const CBlockIndex *pindex)
 }
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
- *  at most count entries. */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<const CBlockIndex*>& vBlocks, NodeId& nodeStaller, const Consensus::Params& consensusParams) {
+ *  at most count entries.
+ *  returns true if priority downloads where used
+ */
+bool FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<const CBlockIndex*>& vBlocks, NodeId& nodeStaller, const Consensus::Params& consensusParams) {
     if (count == 0)
-        return;
+        return false;
 
     vBlocks.reserve(vBlocks.size() + count);
     CNodeState *state = State(nodeid);
@@ -466,9 +489,22 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     ProcessBlockAvailability(nodeid);
 
+    if (!blocksToDownloadFirst.empty()) {
+        for (const PriorityBlockRequest &r: blocksToDownloadFirst) {
+            if (r.downloaded) continue;
+            if (r.pindex && state->pindexBestKnownBlock != NULL && state->pindexBestKnownBlock->nHeight >= r.pindex->nHeight && !mapBlocksInFlight.count(r.pindex->GetBlockHash())) {
+                vBlocks.push_back(r.pindex);
+                if (vBlocks.size() == count) {
+                    return true;
+                }
+            }
+        }
+        return true;
+    }
+
     if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork || state->pindexBestKnownBlock->nChainWork < UintToArith256(consensusParams.nMinimumChainWork)) {
         // This peer has nothing interesting.
-        return;
+        return false;
     }
 
     if (state->pindexLastCommonBlock == NULL) {
@@ -481,7 +517,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
     // of its current tip anymore. Go back enough to fix that.
     state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
-        return;
+        return false;
 
     std::vector<const CBlockIndex*> vToFetch;
     const CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
@@ -510,11 +546,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
         for (const CBlockIndex* pindex : vToFetch) {
             if (!pindex->IsValid(BLOCK_VALID_TREE)) {
                 // We consider the chain that this peer is on invalid.
-                return;
+                return false;
             }
             if (!State(nodeid)->fHaveWitness && IsWitnessEnabled(pindex->pprev, consensusParams)) {
                 // We wouldn't download this block or its descendants from this peer.
-                return;
+                return false;
             }
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx)
@@ -527,11 +563,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
                         // We aren't able to fetch anything, but we would be if the download window was one larger.
                         nodeStaller = waitingfor;
                     }
-                    return;
+                    return false;
                 }
                 vBlocks.push_back(pindex);
                 if (vBlocks.size() == count) {
-                    return;
+                    return false;
                 }
             } else if (waitingfor == -1) {
                 // This is the first already-in-flight block.
@@ -539,6 +575,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
             }
         }
     }
+    return false;
 }
 
 } // namespace
@@ -2383,7 +2420,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             LOCK(cs_main);
             // Also always process if we requested the block explicitly, as we may
             // need it even though it is not a candidate for a new best tip.
-            forceProcessing |= MarkBlockAsReceived(hash);
+            MarkBlockAsReceivedResult result = MarkBlockAsReceived(hash);
+            forceProcessing |= result.fRequested;
             // mapBlockSource is only used for sending reject messages and DoS scores,
             // so the race between here and cs_main in ProcessNewBlock is fine.
             mapBlockSource.emplace(hash, std::make_pair(pfrom->GetId(), true));
@@ -3231,12 +3269,12 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         if (!pto->fClient && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             std::vector<const CBlockIndex*> vToDownload;
             NodeId staller = -1;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
+            bool priorityRequest = FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
             for (const CBlockIndex *pindex : vToDownload) {
                 uint32_t nFetchFlags = GetFetchFlags(pto);
                 vGetData.push_back(CInv(MSG_BLOCK | nFetchFlags, pindex->GetBlockHash()));
-                MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
-                LogPrint(BCLog::NET, "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex, NULL, priorityRequest);
+                LogPrint(BCLog::NET, "Requesting%s block %s (%d) peer=%d\n", (priorityRequest ? " (priority)" : " "), pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->GetId());
             }
             if (state.nBlocksInFlight == 0 && staller != -1) {
@@ -3300,6 +3338,14 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         }
     }
     return true;
+}
+
+void AddPriorityDownload(std::vector<const CBlockIndex*>& blocksToDownload) {
+    LOCK(cs_main);
+    for (const CBlockIndex* pindex: blocksToDownload) {
+        // we add blocks regardless of duplicates
+        blocksToDownloadFirst.push_back({pindex, false});
+    }
 }
 
 class CNetProcessingCleanup
