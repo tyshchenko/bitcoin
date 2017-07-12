@@ -2415,19 +2415,20 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         // Such an unrequested block may still be processed, subject to the
         // conditions in AcceptBlock().
         bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
+        MarkBlockAsReceivedResult result;
         const uint256 hash(pblock->GetHash());
         {
             LOCK(cs_main);
             // Also always process if we requested the block explicitly, as we may
             // need it even though it is not a candidate for a new best tip.
-            MarkBlockAsReceivedResult result = MarkBlockAsReceived(hash);
+            result = MarkBlockAsReceived(hash);
             forceProcessing |= result.fRequested;
             // mapBlockSource is only used for sending reject messages and DoS scores,
             // so the race between here and cs_main in ProcessNewBlock is fine.
             mapBlockSource.emplace(hash, std::make_pair(pfrom->GetId(), true));
         }
         bool fNewBlock = false;
-        ProcessNewBlock(chainparams, pblock, forceProcessing, &fNewBlock);
+        ProcessNewBlock(chainparams, pblock, forceProcessing, &fNewBlock, !result.fPriorityRequest);
         if (fNewBlock)
             pfrom->nLastBlockTime = GetTime();
     }
