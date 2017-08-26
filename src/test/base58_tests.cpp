@@ -93,6 +93,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
         bool isPrivkey = find_value(metadata, "isPrivkey").get_bool();
         bool isTestnet = find_value(metadata, "chain").get_str() == "testnet";
         bool regtest = find_value(metadata, "chain").get_str() == "regtest";
+        bool try_case_flip = find_value(metadata, "tryCaseFlip").isNull() ? false : find_value(metadata, "tryCaseFlip").get_bool();
         if (regtest) {
             SelectParams(CBaseChainParams::REGTEST);
         } else if (isTestnet) {
@@ -118,6 +119,21 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
             CScript script = GetScriptForDestination(destination);
             BOOST_CHECK_MESSAGE(IsValidDestination(destination), "!IsValid:" + strTest);
             BOOST_CHECK_EQUAL(HexStr(script), HexStr(exp_payload));
+
+            // Try flipped case version
+            for (char& c : exp_base58string) {
+                if (c >= 'a' && c <= 'z') {
+                    c = (c - 'a') + 'A';
+                } else if (c >= 'A' && c <= 'Z') {
+                    c = (c - 'A') + 'a';
+                }
+            }
+            destination = DecodeDestination(exp_base58string);
+            BOOST_CHECK_MESSAGE(IsValidDestination(destination) == try_case_flip, "!IsValid case flipped:" + strTest);
+            if (IsValidDestination(destination)) {
+                script = GetScriptForDestination(destination);
+                BOOST_CHECK_EQUAL(HexStr(script), HexStr(exp_payload));
+            }
 
             // Public key must be invalid private key
             secret.SetString(exp_base58string);
@@ -165,12 +181,14 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen)
             CScript exp_script(exp_payload.begin(), exp_payload.end());
             ExtractDestination(exp_script, dest);
             std::string address = EncodeDestination(dest);
+
             BOOST_CHECK_EQUAL(address, exp_base58string);
         }
     }
 
     SelectParams(CBaseChainParams::MAIN);
 }
+
 
 // Goal: check that base58 parsing code is robust against a variety of corrupted data
 BOOST_AUTO_TEST_CASE(base58_keys_invalid)
@@ -202,4 +220,3 @@ BOOST_AUTO_TEST_CASE(base58_keys_invalid)
 
 
 BOOST_AUTO_TEST_SUITE_END()
-
