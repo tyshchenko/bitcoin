@@ -668,9 +668,12 @@ bool CWalletDBWrapper::Backup(const std::string& strDest)
                 // Copy wallet file
                 fs::path pathSrc = GetDataDir() / strFile;
                 fs::path pathDest(strDest);
-                if (fs::is_directory(pathDest))
+                if (fs::is_directory(pathDest)) {
                     pathDest /= strFile;
-
+                }
+                if (pathSrc == pathDest) {
+                    return false;
+                }
                 try {
                     fs::copy_file(pathSrc, pathDest, fs::copy_option::overwrite_if_exists);
                     LogPrintf("copied %s to %s\n", strFile, pathDest.string());
