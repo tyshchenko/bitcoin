@@ -96,6 +96,9 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.push_back(Pair("bits", strprintf("%08x", blockindex->nBits)));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
     result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+    result.push_back(Pair("blocksize", (blockindex->nStatus & BLOCK_SER_WITH_SIZE) ? (int)blockindex->n_size : -1));
+    result.push_back(Pair("blockstrippedsize", (blockindex->nStatus & BLOCK_SER_WITH_SIZE) ? (int)blockindex->n_strippedsize : -1));
+    result.push_back(Pair("blockweight", (blockindex->nStatus & BLOCK_SER_WITH_SIZE) ? (int)::GetBlockWeightN(blockindex->n_size, blockindex->n_strippedsize) : -1));
 
     if (blockindex->pprev)
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
@@ -657,6 +660,9 @@ UniValue getblockheader(const JSONRPCRequest& request)
             "  \"chainwork\" : \"0000...1f3\"     (string) Expected number of hashes required to produce the current chain (in hex)\n"
             "  \"previousblockhash\" : \"hash\",  (string) The hash of the previous block\n"
             "  \"nextblockhash\" : \"hash\",      (string) The hash of the next block\n"
+            "  \"blocksize\" : ttt,          (numeric) The block size (-1 is not available)\n"
+            "  \"blockstrippedsize\" : n,    (numeric) The block size excluding witness data (-1 is not available)\n"
+            "  \"blockweight\" : n           (numeric) The block weight as defined in BIP 141 (-1 is not available)\n"
             "}\n"
             "\nResult (for verbose=false):\n"
             "\"data\"             (string) A string that is serialized, hex-encoded data for block 'hash'.\n"
