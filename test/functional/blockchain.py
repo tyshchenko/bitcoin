@@ -179,7 +179,9 @@ class BlockchainTest(BitcoinTestFramework):
         besthash = node.getbestblockhash()
         secondbesthash = node.getblockhash(199)
         header = node.getblockheader(besthash)
-
+        assert_equal(header['blocksize'] > 0, True)
+        assert_equal(header['blocksize'] > header['blockstrippedsize'], True)
+        assert_equal(header['blockweight'] > header['blocksize'], True)
         assert_equal(header['hash'], besthash)
         assert_equal(header['height'], 200)
         assert_equal(header['confirmations'], 1)
