@@ -159,7 +159,9 @@ enum BlockStatus: uint32_t {
     BLOCK_FAILED_CHILD       =   64, //!< descends from failed block
     BLOCK_FAILED_MASK        =   BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
 
-    BLOCK_OPT_WITNESS       =   128, //!< block data in blk*.data was received with a witness-enforcing client
+    BLOCK_OPT_WITNESS        =   128, //!< block data in blk*.data was received with a witness-enforcing client
+
+    BLOCK_SER_WITH_SIZE      =   256, //!< block index contains cached block sizes
 };
 
 /** The block chain is a tree shaped structure starting with the
@@ -184,6 +186,12 @@ public:
 
     //! Which # file this block is stored in (blk?????.dat)
     int nFile;
+
+    //! Raw size of this block
+    unsigned int n_size;
+
+    //! Block size excluding witness data
+    unsigned int n_strippedsize;
 
     //! Byte offset within blk?????.dat where this block's data is stored
     unsigned int nDataPos;
@@ -226,6 +234,8 @@ public:
         pskip = nullptr;
         nHeight = 0;
         nFile = 0;
+        n_size = 0;
+        n_strippedsize = 0;
         nDataPos = 0;
         nUndoPos = 0;
         nChainWork = arith_uint256();
@@ -397,6 +407,10 @@ public:
             READWRITE(VARINT(nDataPos));
         if (nStatus & BLOCK_HAVE_UNDO)
             READWRITE(VARINT(nUndoPos));
+        if (nStatus & BLOCK_SER_WITH_SIZE) {
+            READWRITE(VARINT(n_size));
+            READWRITE(VARINT(n_strippedsize));
+        }
 
         // block header
         READWRITE(this->nVersion);

@@ -3219,6 +3219,12 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
     // Write block to history file
     try {
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+
+        // cache block size(s)
+        pindex->n_size = nBlockSize;
+        pindex->n_strippedsize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
+        pindex->nStatus |= BLOCK_SER_WITH_SIZE;
+
         CDiskBlockPos blockPos;
         if (dbp != nullptr)
             blockPos = *dbp;
