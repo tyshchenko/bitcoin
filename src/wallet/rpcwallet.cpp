@@ -34,34 +34,21 @@
 
 #include <univalue.h>
 
-void JSONRPCRequestWalletResolver(JSONRPCRequest& jreq, const HTTPRequest& httpreq)
-{
-    static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
-
-    jreq.wallet = nullptr;
-    if (jreq.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
-        // wallet endpoint was used
-        std::string requestedWallet = urlDecode(jreq.URI.substr(WALLET_ENDPOINT_BASE.size()));
-        for (CWalletRef pwallet : ::vpwallets) {
-            if (pwallet->GetName() == requestedWallet) {
-                jreq.wallet = pwallet;
-            }
-        }
-        if (!jreq.wallet) {
-            throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
-        }
-    } else if (::vpwallets.size() == 1) {
-        jreq.wallet = ::vpwallets[0];
-    }
-}
+static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 
 CWallet *GetWalletForJSONRPCRequest(const JSONRPCRequest& request)
 {
-    if (request.fHelp && (!request.wallet) && ::vpwallets.size() > 0) {
-        return ::vpwallets[0];
+    if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
+        // wallet endpoint was used
+        std::string requestedWallet = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
+        for (CWalletRef pwallet : ::vpwallets) {
+            if (pwallet->GetName() == requestedWallet) {
+                return pwallet;
+            }
+        }
+        throw JSONRPCError(RPC_WALLET_NOT_FOUND, "Requested wallet does not exist or is not loaded");
     }
-
-    return request.wallet;
+    return ::vpwallets.size() == 1 || (request.fHelp && ::vpwallets.size() > 0) ? ::vpwallets[0] : nullptr;
 }
 
 std::string HelpRequiringPassphrase(CWallet * const pwallet)

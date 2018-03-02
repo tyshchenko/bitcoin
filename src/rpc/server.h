@@ -47,9 +47,8 @@ public:
     bool fHelp;
     std::string URI;
     std::string authUser;
-    CWallet *wallet;
 
-    JSONRPCRequest() : id(NullUniValue), params(NullUniValue), fHelp(false), wallet(nullptr) {}
+    JSONRPCRequest() : id(NullUniValue), params(NullUniValue), fHelp(false) {}
     void parse(const UniValue& valRequest);
 };
 

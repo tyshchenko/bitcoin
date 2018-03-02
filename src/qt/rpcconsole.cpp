@@ -302,10 +302,11 @@ bool RPCConsole::RPCParseCommandLine(std::string &strResult, const std::string &
                             JSONRPCRequest req;
                             req.params = RPCConvertValues(stack.back()[0], std::vector<std::string>(stack.back().begin() + 1, stack.back().end()));
                             req.strMethod = stack.back()[0];
-#ifdef ENABLE_WALLET
+#ifdef ENABLE_WALLET        
                             CWalletRef * const ppwallet = (CWalletRef*)ppwallet_v;
                             if (ppwallet) {
-                                req.wallet = *ppwallet;
+                                QByteArray encodedName = QUrl::toPercentEncoding(QString::fromStdString((*ppwallet)->GetName()));
+                                req.URI = "/wallet/"+std::string(encodedName.constData(), encodedName.length());
                                 delete ppwallet;
                             }
 #endif
