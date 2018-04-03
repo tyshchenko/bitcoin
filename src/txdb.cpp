@@ -435,29 +435,33 @@ bool TxIndexDB::ReadTxPos(const uint256 &txid, CDiskTxPos& pos) const
     return Read(std::make_pair(DB_TXINDEX, txid), pos);
 }
 
-bool TxIndexDB::WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos,
-                         const uint256& block_hash)
+bool TxIndexDB::WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos)
 {
     CDBBatch batch(*this);
     for (const auto& tuple : v_pos) {
         batch.Write(std::make_pair(DB_TXINDEX, tuple.first), tuple.second);
     }
-    batch.Write(DB_BEST_BLOCK, block_hash);
     return WriteBatch(batch);
 }
 
-bool TxIndexDB::ReadBestBlockHash(uint256& hash) const {
-    if (Read(DB_BEST_BLOCK, hash)) {
+bool TxIndexDB::ReadBestBlock(CBlockLocator& locator) const
+{
+    if (Read(DB_BEST_BLOCK, locator)) {
         return true;
     }
 
     // Read might have failed either because key does not exist or due to an error.
     // If the former, return value should still be true.
     if (!Exists(DB_BEST_BLOCK)) {
-        hash.SetNull();
+        locator.SetNull();
         return true;
     }
     return false;
+}
+
+bool TxIndexDB::WriteBestBlock(const CBlockLocator& locator)
+{
+    return Write(DB_BEST_BLOCK, locator);
 }
 
 /*
@@ -478,7 +482,7 @@ static void WriteTxIndexMigrationBatches(TxIndexDB& newdb, CBlockTreeDB& olddb,
     batch_olddb.Clear();
 }
 
-bool TxIndexDB::MigrateData(CBlockTreeDB& block_tree_db, const uint256& tip_hash)
+bool TxIndexDB::MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator)
 {
     // The prior implementation of txindex was always in sync with block index
     // and presence was indicated with a boolean DB flag. If the flag is set,
@@ -497,7 +501,7 @@ bool TxIndexDB::MigrateData(CBlockTreeDB& block_tree_db, const uint256& tip_hash
     bool f_legacy_flag = false;
     block_tree_db.ReadFlag("txindex", f_legacy_flag);
     if (f_legacy_flag) {
-        if (!block_tree_db.Write(DB_TXINDEX_BLOCK, tip_hash)) {
+        if (!block_tree_db.Write(DB_TXINDEX_BLOCK, best_locator)) {
             return error("%s: cannot write block indicator", __func__);
         }
         if (!block_tree_db.WriteFlag("txindex", false)) {
@@ -505,8 +509,8 @@ bool TxIndexDB::MigrateData(CBlockTreeDB& block_tree_db, const uint256& tip_hash
         }
     }
 
-    uint256 block_hash;
-    if (!block_tree_db.Read(DB_TXINDEX_BLOCK, block_hash)) {
+    CBlockLocator locator;
+    if (!block_tree_db.Read(DB_TXINDEX_BLOCK, locator)) {
         return true;
     }
 
@@ -572,7 +576,7 @@ bool TxIndexDB::MigrateData(CBlockTreeDB& block_tree_db, const uint256& tip_hash
     // that all txindex entries have been removed from the latter.
     if (!interrupted) {
         batch_olddb.Erase(DB_TXINDEX_BLOCK);
-        batch_newdb.Write(DB_BEST_BLOCK, block_hash);
+        batch_newdb.Write(DB_BEST_BLOCK, locator);
     }
 
     WriteTxIndexMigrationBatches(*this, block_tree_db,

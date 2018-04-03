@@ -9,6 +9,7 @@
 #include <coins.h>
 #include <dbwrapper.h>
 #include <chain.h>
+#include <primitives/block.h>
 
 #include <map>
 #include <string>
@@ -123,7 +124,15 @@ public:
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex);
 };
 
-/** Access to the txindex database (indexes/txindex/) */
+/**
+ * Access to the txindex database (indexes/txindex/)
+ *
+ * The database stores a block locator of the chain the database is synced to
+ * so that the TxIndex can efficiently determine the point it last stopped at.
+ * A locator is used instead of a simple hash of the chain tip because blocks
+ * and block index entries may not be flushed to disk until after this database
+ * is updated.
+ */
 class TxIndexDB : public CDBWrapper
 {
 public:
@@ -134,15 +143,17 @@ public:
     bool ReadTxPos(const uint256& txid, CDiskTxPos& pos) const;
 
     /// Write a batch of transaction positions to the DB.
-    bool WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos,
-                  const uint256& block_hash);
+    bool WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos);
 
-    /// Read the best block hash of the chain that the txindex is in sync with.
-    bool ReadBestBlockHash(uint256& hash) const;
+    /// Read block locator of the chain that the txindex is in sync with.
+    bool ReadBestBlock(CBlockLocator& hash) const;
+
+    /// Write block locator of the chain that the txindex is in sync with.
+    bool WriteBestBlock(const CBlockLocator& locator);
 
     /// Migrate txindex data from the block tree DB, where it may be for older nodes that have not
     /// been upgraded yet to the new database.
-    bool MigrateData(CBlockTreeDB& block_tree_db, const uint256& tip_hash);
+    bool MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator);
 };
 
 #endif // BITCOIN_TXDB_H
