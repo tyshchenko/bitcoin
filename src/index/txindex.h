@@ -5,6 +5,7 @@
 #ifndef BITCOIN_INDEX_TXINDEX_H
 #define BITCOIN_INDEX_TXINDEX_H
 
+#include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <threadinterrupt.h>
 #include <txdb.h>
@@ -50,6 +51,8 @@ private:
 protected:
     void BlockConnected(const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex,
                         const std::vector<CTransactionRef>& txn_conflicted) override;
+
+    void SetBestChain(const CBlockLocator& locator) override;
 
 public:
     /// Constructs the TxIndex, which becomes available to be queried.

@@ -41,45 +41,21 @@ bool TxIndex::Init()
 {
     LOCK(cs_main);
 
-    const CBlockIndex* chain_tip = chainActive.Tip();
-    uint256 tip_hash;
-    if (chain_tip) {
-        tip_hash = chain_tip->GetBlockHash();
-    }
-
     // Attempt to migrate txindex from the old database to the new one. Even if
     // chain_tip is null, the node could be reindexing and we still want to
     // delete txindex records in the old database.
-    if (!m_db->MigrateData(*pblocktree, tip_hash)) {
+    if (!m_db->MigrateData(*pblocktree, chainActive.GetLocator())) {
         return false;
     }
 
-    if (!chain_tip) {
-        m_synced = true;
-        return true;
-    }
-
-    uint256 best_block_hash;
-    if (!m_db->ReadBestBlockHash(best_block_hash)) {
+    CBlockLocator locator;
+    if (!m_db->ReadBestBlock(locator)) {
         FatalError("%s: Failed to read from tx index database", __func__);
         return false;
     }
 
-    if (best_block_hash.IsNull()) {
-        return true;
-    }
-
-    const CBlockIndex* pindex = LookupBlockIndex(best_block_hash);
-    if (!pindex) {
-        FatalError("%s: Last block synced by txindex is unknown", __func__);
-        return false;
-    }
-
-    m_best_block_index = pindex;
-    if (pindex->GetAncestor(chain_tip->nHeight) == chain_tip) {
-        m_synced = true;
-    }
-
+    m_best_block_index = FindForkInGlobalIndex(chainActive, locator);
+    m_synced = m_best_block_index.load() == chainActive.Tip();
     return true;
 }
 
@@ -115,6 +91,9 @@ void TxIndex::ThreadSync()
                 LOCK(cs_main);
                 const CBlockIndex* pindex_next = NextSyncBlock(pindex);
                 if (!pindex_next) {
+                    if (!m_db->WriteBestBlock(chainActive.GetLocator())) {
+                        error("%s: Failed to write locator to disk", __func__);
+                    }
                     m_best_block_index = pindex;
                     m_synced = true;
                     break;
@@ -158,7 +137,7 @@ bool TxIndex::WriteBlock(const CBlock& block, const CBlockIndex* pindex)
         vPos.emplace_back(tx->GetHash(), pos);
         pos.nTxOffset += ::GetSerializeSize(*tx, SER_DISK, CLIENT_VERSION);
     }
-    return m_db->WriteTxs(vPos, pindex->GetBlockHash());
+    return m_db->WriteTxs(vPos);
 }
 
 void TxIndex::BlockConnected(const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex,
@@ -196,6 +175,44 @@ void TxIndex::BlockConnected(const std::shared_ptr<const CBlock>& block, const C
         FatalError("%s: Failed to write block %s to txindex",
                    __func__, pindex->GetBlockHash().ToString());
         return;
+    }
+}
+
+void TxIndex::SetBestChain(const CBlockLocator& locator)
+{
+    if (!m_synced) {
+        return;
+    }
+
+    const uint256& locator_tip_hash = locator.vHave.front();
+    const CBlockIndex* locator_tip_index;
+    {
+        LOCK(cs_main);
+        locator_tip_index = LookupBlockIndex(locator_tip_hash);
+    }
+
+    if (!locator_tip_index) {
+        FatalError("%s: First block (hash=%s) in locator was not found",
+                   __func__, locator_tip_hash.ToString());
+        return;
+    }
+
+    // This checks that SetBestChain callbacks are received after BlockConnected. The check may fail
+    // immediately after the the sync thread catches up and sets m_synced. Consider the case where
+    // there is a reorg and the blocks on the stale branch are in the ValidationInterface queue
+    // backlog even after the sync thread has caught up to the new chain tip. In this unlikely
+    // event, log a warning and let the queue clear.
+    const CBlockIndex* best_block_index = m_best_block_index.load();
+    if (best_block_index->GetAncestor(locator_tip_index->nHeight) != locator_tip_index) {
+        LogPrintf("%s: WARNING: Locator contains block (hash=%s) not on known best chain "
+                  "(tip=%s); not writing txindex locator\n",
+                  __func__, locator_tip_hash.ToString(),
+                  best_block_index->GetBlockHash().ToString());
+        return;
+    }
+
+    if (!m_db->WriteBestBlock(locator)) {
+        error("%s: Failed to write locator to disk", __func__);
     }
 }
 
