@@ -1005,7 +1005,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
  * Return transaction in txOut, and if it was found inside a block, its hash is placed in hashBlock.
  * If blockIndex is provided, the transaction is fetched from the corresponding block.
  */
-bool GetTransaction(const uint256& hash, CTransactionRef& txOut, const Consensus::Params& consensusParams, uint256& hashBlock, bool fAllowSlow, CBlockIndex* blockIndex)
+GetTransactionResult GetTransaction(const uint256& hash, CTransactionRef& txOut, const Consensus::Params& consensusParams, uint256& hashBlock, bool fAllowSlow, CBlockIndex* blockIndex)
 {
     CBlockIndex* pindexSlow = blockIndex;
 
@@ -1015,7 +1015,7 @@ bool GetTransaction(const uint256& hash, CTransactionRef& txOut, const Consensus
         CTransactionRef ptx = mempool.get(hash);
         if (ptx) {
             txOut = ptx;
-            return true;
+            return GetTransactionResult::LOAD_OK;
         }
 
         if (g_txindex) {
@@ -1035,13 +1035,13 @@ bool GetTransaction(const uint256& hash, CTransactionRef& txOut, const Consensus
                 if (tx->GetHash() == hash) {
                     txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
-                    return true;
+                    return GetTransactionResult::LOAD_OK;
                 }
             }
         }
     }
 
-    return false;
+    return GetTransactionResult::NOT_FOUND;
 }
 
 

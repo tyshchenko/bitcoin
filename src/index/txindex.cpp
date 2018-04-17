@@ -240,16 +240,21 @@ bool TxIndex::BlockUntilSyncedToCurrentChain()
     return true;
 }
 
-bool TxIndex::FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const
+GetTransactionResult TxIndex::FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const
 {
     CDiskTxPos postx;
     if (!m_db->ReadTxPos(tx_hash, postx)) {
-        return false;
+        return GetTransactionResult::NOT_FOUND;
     }
 
     CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
     if (file.IsNull()) {
-        return error("%s: OpenBlockFile failed", __func__);
+        if (fPruneMode) {
+            return GetTransactionResult::BLOCK_PRUNED;
+        } else {
+            error("%s: OpenBlockFile failed", __func__);
+            return GetTransactionResult::BLOCK_LOAD_ERROR;
+        }
     }
     CBlockHeader header;
     try {
@@ -257,13 +262,15 @@ bool TxIndex::FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRe
         fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
         file >> tx;
     } catch (const std::exception& e) {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+        error("%s: Deserialize or I/O error - %s", __func__, e.what());
+        return GetTransactionResult::BLOCK_LOAD_ERROR;
     }
     if (tx->GetHash() != tx_hash) {
-        return error("%s: txid mismatch", __func__);
+        error("%s: txid mismatch", __func__);
+        return GetTransactionResult::BLOCK_LOAD_ERROR;
     }
     block_hash = header.GetHash();
-    return true;
+    return GetTransactionResult::LOAD_OK;
 }
 
 void TxIndex::Interrupt()

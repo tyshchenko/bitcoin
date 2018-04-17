@@ -12,6 +12,7 @@
 #include <uint256.h>
 #include <validationinterface.h>
 
+enum class GetTransactionResult; //decared in validation.h
 class CBlockIndex;
 
 /**
@@ -73,7 +74,7 @@ public:
     /// @param[out]  block_hash  The hash of the block the transaction is found in.
     /// @param[out]  tx  The raw transaction itself.
     /// @return  true if transaction is found, false otherwise
-    bool FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const;
+    GetTransactionResult FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const;
 
     void Interrupt();
 
