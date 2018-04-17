@@ -3495,6 +3495,12 @@ void PruneOneBlockFile(const int fileNumber)
     for (const auto& entry : mapBlockIndex) {
         CBlockIndex* pindex = entry.second;
         if (pindex->nFile == fileNumber) {
+
+            CBlock block;
+            if (g_txindex && ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
+                g_txindex->PruneUpdateTx(block, pindex->nHeight);
+            }
+
             pindex->nStatus &= ~BLOCK_HAVE_DATA;
             pindex->nStatus &= ~BLOCK_HAVE_UNDO;
             pindex->nFile = 0;

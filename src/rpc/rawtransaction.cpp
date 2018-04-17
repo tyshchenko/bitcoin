@@ -185,7 +185,10 @@ UniValue getrawtransaction(const JSONRPCRequest& request)
             }
             errmsg = "No such transaction found in the provided block";
         } else if (res == GetTransactionResult::BLOCK_PRUNED) {
-            throw JSONRPCError(RPC_MISC_ERROR, "Block not available");
+            UniValue result(UniValue::VOBJ);
+            result.pushKV("statue", "pruned");
+            result.pushKV("block", hash_block.GetHex());
+            return result;
         } else if (!g_txindex) {
             errmsg = "No such mempool transaction. Use -txindex to enable blockchain transaction queries";
         } else if (!f_txindex_ready) {

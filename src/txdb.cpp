@@ -444,6 +444,27 @@ bool TxIndexDB::WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_po
     return WriteBatch(batch);
 }
 
+bool TxIndexDB::EraseAndWriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos)
+{
+    CDBBatch batch(*this);
+    for (const auto& tuple : v_pos) {
+        batch.Erase(std::make_pair(DB_TXINDEX, tuple.first));
+        batch.Write(std::make_pair(DB_TXINDEX, tuple.first), tuple.second);
+    }
+    return WriteBatch(batch);
+}
+
+/*
+bool TxIndexDB::WriteAddrindex(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos)
+{
+    CDBBatch batch(*this);
+    for (const auto& tuple : v_pos) {
+        batch.Write(std::make_pair(DB_TXINDEX, tuple.first), tuple.second);
+    }
+    return WriteBatch(batch);
+}
+*/
+
 bool TxIndexDB::ReadBestBlock(CBlockLocator& locator) const
 {
     if (Read(DB_BEST_BLOCK, locator)) {

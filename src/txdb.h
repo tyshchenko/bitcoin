@@ -144,6 +144,7 @@ public:
 
     /// Write a batch of transaction positions to the DB.
     bool WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos);
+    bool EraseAndWriteTxs(const std::vector<std::pair<uint256, CDiskTxPos>>& v_pos);
 
     /// Read block locator of the chain that the txindex is in sync with.
     bool ReadBestBlock(CBlockLocator& hash) const;

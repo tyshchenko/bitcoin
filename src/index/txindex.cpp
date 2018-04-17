@@ -4,7 +4,10 @@
 
 #include <chainparams.h>
 #include <index/txindex.h>
+#include <dbwrapper.h>
 #include <init.h>
+#include <pubkey.h>
+#include <script/standard.h>
 #include <tinyformat.h>
 #include <ui_interface.h>
 #include <util.h>
@@ -133,10 +136,44 @@ bool TxIndex::WriteBlock(const CBlock& block, const CBlockIndex* pindex)
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos>> vPos;
     vPos.reserve(block.vtx.size());
+    std::vector<std::pair<CTxDestination, uint256>> vAddr;
     for (const auto& tx : block.vtx) {
         vPos.emplace_back(tx->GetHash(), pos);
         pos.nTxOffset += ::GetSerializeSize(*tx, SER_DISK, CLIENT_VERSION);
+
+        for (const CTxOut& out : tx->vout) {
+            CTxDestination address;
+            if (ExtractDestination(out.scriptPubKey, address)) {
+                //const CKeyID *keyID = boost::get<CKeyID>(address);
+                vAddr.emplace_back(address, tx->GetHash());
+            }
+        }
     }
+
+    std::unique_ptr<CDBIterator> pcursor(m_db->NewIterator());
+    CDBBatch batch(*m_db);
+    for (const auto& tuple : vAddr) {
+        if (auto key_id = boost::get<CKeyID>(&tuple.first)) {
+            //batch.Write(std::make_pair('a', *key_id), tuple.second);
+        }
+        if (auto script_id = boost::get<CScriptID>(&tuple.first)) {
+            batch.Write(std::make_pair('a', *script_id), tuple.second);
+
+            pcursor->Seek(std::make_pair('a', *script_id));
+
+            while (pcursor->Valid()) {
+                boost::this_thread::interruption_point();
+                CScriptID key;
+                uint256 txid;
+                if (pcursor->GetKey(key) && pcursor->GetValue(txid)) {
+                    int i = 0;
+                }
+                pcursor->Next();
+            }
+        }
+    }
+    m_db->WriteBatch(batch);
+
     return m_db->WriteTxs(vPos);
 }
 
@@ -240,21 +277,34 @@ bool TxIndex::BlockUntilSyncedToCurrentChain()
     return true;
 }
 
+void TxIndex::PruneUpdateTx(const CBlock& block, int height) const
+{
+    std::vector<std::pair<uint256, CDiskTxPos>> vPos;
+    unsigned int txpos = 0;
+    for(const auto& tx : block.vtx)
+    {
+        CDiskTxPos pos(CDiskBlockPos(std::numeric_limits<int>::max(), height), GetSizeOfCompactSize(txpos++));
+        vPos.emplace_back(tx->GetHash(), pos);
+    }
+    m_db->EraseAndWriteTxs(vPos);
+}
+
 GetTransactionResult TxIndex::FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const
 {
     CDiskTxPos postx;
     if (!m_db->ReadTxPos(tx_hash, postx)) {
         return GetTransactionResult::NOT_FOUND;
     }
+    if (postx.nFile == std::numeric_limits<int>::max()) {
+        // file is pruned
+        block_hash = *chainActive[postx.nPos]->phashBlock;
+        return GetTransactionResult::BLOCK_PRUNED;
+    }
 
     CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
     if (file.IsNull()) {
-        if (fPruneMode) {
-            return GetTransactionResult::BLOCK_PRUNED;
-        } else {
-            error("%s: OpenBlockFile failed", __func__);
-            return GetTransactionResult::BLOCK_LOAD_ERROR;
-        }
+        error("%s: OpenBlockFile failed", __func__);
+        return GetTransactionResult::BLOCK_LOAD_ERROR;
     }
     CBlockHeader header;
     try {

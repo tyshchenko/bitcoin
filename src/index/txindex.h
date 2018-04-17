@@ -76,6 +76,8 @@ public:
     /// @return  true if transaction is found, false otherwise
     GetTransactionResult FindTx(const uint256& tx_hash, uint256& block_hash, CTransactionRef& tx) const;
 
+    void PruneUpdateTx(const CBlock& tx_hash, int height) const;
+
     void Interrupt();
 
     /// Start initializes the sync state and registers the instance as a
