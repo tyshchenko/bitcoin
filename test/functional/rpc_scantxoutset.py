@@ -55,6 +55,8 @@ class ScantxoutsetTest(BitcoinTestFramework):
         self.start_node(0)
         self.log.info("Test if we have found the non HD unspent outputs.")
         assert_equal(self.nodes[0].scantxoutset("start", [ {"pubkey": {"pubkey": pubk1}}, {"pubkey": {"pubkey": pubk2}}, {"pubkey": {"pubkey": pubk3}}])['total_amount'], 6)
+        decodedsweeptx = self.nodes[0].decoderawtransaction(self.nodes[0].scantxoutset("start", [ {"pubkey": {"pubkey": pubk1}}, {"pubkey": {"pubkey": pubk2}}, {"pubkey": {"pubkey": pubk3}}], {"rawsweep" : {"address": addr_BECH32, "feerate": 0.00025000}})['rawsweep_tx'])
+        assert_equal(len(decodedsweeptx['vin']), 3)
         assert_equal(self.nodes[0].scantxoutset("start", [ {"address": addr_P2SH_SEGWIT}, {"address": addr_LEGACY}, {"address": addr_BECH32}])['total_amount'], 6)
         assert_equal(self.nodes[0].scantxoutset("start", [ {"address": addr_P2SH_SEGWIT}, {"address": addr_LEGACY}, {"pubkey": {"pubkey": pubk3}} ])['total_amount'], 6)
 

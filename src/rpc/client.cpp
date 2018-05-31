@@ -80,6 +80,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "sendmany", 5 , "replaceable" },
     { "sendmany", 6 , "conf_target" },
     { "scantxoutset", 1, "scanobjects" },
+    { "scantxoutset", 2, "options" },
     { "addmultisigaddress", 0, "nrequired" },
     { "addmultisigaddress", 1, "keys" },
     { "createmultisig", 0, "nrequired" },
