@@ -2009,6 +2009,13 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             "            \"script_types\" : [ ... ],      (array, optional) Array of script-types to derive from the pubkey (possible values: \"P2PKH\", \"P2SH-P2WPKH\", \"P2WPKH\")\n"
             "          }\n"
             "        },\n"
+            "        { \"xpub\"  :                        (object, optional) Use an extended public key child key range (m/0/k & m/1/k) to derive scripts from\n"
+            "          { \n"
+            "            \"xpub\" : \"<xpub\">,             (string, required) Base58check encoded extended public key (xpub)\n"
+            "            \"range\" : [ <s>, <e> ],        (array, optional) Range of keys that will be deriven from the given xpubs (default is 0 to 1000)\n"
+            "            \"script_types\" : [ ... ],      (array, optional) Array of derivation type (possible values: \"P2PKH\", \"P2SH-P2WPKH\", \"P2WPKH\")\n"
+            "          }\n"
+            "        },\n"
             "      ]\n"
             "\nResult:\n"
             "{\n"
@@ -2059,9 +2066,10 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             }
             UniValue address_uni = find_value(scanobject, "address");
             UniValue pubkey_uni  = find_value(scanobject, "pubkey");
+            UniValue xpub_uni    = find_value(scanobject, "xpub");
 
             // make sure only one object type is present
-            if (1 != !address_uni.isNull() + !pubkey_uni.isNull()) {
+            if (1 != !address_uni.isNull() + !pubkey_uni.isNull() + !xpub_uni.isNull()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Only one object type is allowed per scan object");
             }
             else if (!address_uni.isNull() && !address_uni.isStr()) {
@@ -2069,6 +2077,9 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             }
             else if (!pubkey_uni.isNull() && !pubkey_uni.isObject()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Scanobject \"pubkey\" must contain an object as value");
+            }
+            else if (!xpub_uni.isNull() && !xpub_uni.isObject()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Scanobject \"xpub\" must contain an object as value");
             }
             else if (address_uni.isStr()) {
                 // type: address
@@ -2120,6 +2131,74 @@ UniValue scantxoutset(const JSONRPCRequest& request)
                     assert(!script.empty());
                     needles.insert(script);
                     temp_keystore.AddWatchOnly(script);
+                }
+            }
+            else if (xpub_uni.isObject()) {
+                // type: extended public key
+                // derive <n> keys after lookup window (range)
+                // derive scripts of all keys according to the script_type parameter
+                UniValue script_types_uni = find_value(xpub_uni, "script_types");
+                UniValue xpubdata_uni = find_value(xpub_uni, "xpub");
+                UniValue range_uni = find_value(xpub_uni, "range");
+
+                // check the script types and use default if not provided
+                if (!script_types_uni.isNull() && !script_types_uni.isArray()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "script_types must be an array");
+                }
+                else if (script_types_uni.isNull()) {
+                    // use the default script types
+                    script_types_uni = UniValue(UniValue::VARR);
+                    for (const char *t : g_default_scantxoutset_script_types) {
+                        script_types_uni.push_back(t);
+                    }
+                }
+
+                //set default child key derivation range
+                unsigned int ckd_range_start = 0;
+                unsigned int ckd_range_end = 1000;
+                if (!range_uni.isNull() && (!range_uni.isArray() || range_uni.get_array().size() != 2)) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "range must be an array with two values");
+                }
+                else if (!range_uni.isNull()) {
+                    // use user defined derive range
+                    ckd_range_start = (unsigned int)range_uni.get_array().getValues()[0].get_int();
+                    ckd_range_end = (unsigned int)range_uni.get_array().getValues()[1].get_int();
+                    if (ckd_range_start > ckd_range_end) {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid range");
+                    }
+                }
+
+                // Derive internal and external chain keys
+                CExtPubKey xpub = DecodeExtPubKey(xpubdata_uni.get_str());
+                if (!xpub.pubkey.IsValid()) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid xpub");
+                }
+                CExtPubKey c0; //external chain
+                CExtPubKey c1; //internal chain
+                xpub.Derive(c0, 0);
+                xpub.Derive(c1, 1);
+
+                for (unsigned int i = ckd_range_start; i <= ckd_range_end; i++) {
+                    // derive both (internal and external chain) child keys
+                    CExtPubKey k_external, k_internal;
+                    c0.Derive(k_external, i);
+                    c1.Derive(k_internal, i);
+
+                    for (const UniValue& script_type_uni : script_types_uni.get_array().getValues()) {
+                        OutputScriptType script_type = GetOutputScriptTypeFromString(script_type_uni.get_str());
+                        if (script_type == OutputScriptType::UNKNOWN) throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script type");
+
+                        // get internal and external scripts and add it to the containers
+                        CScript script = GetScriptForDestination(GetDestinationForKey(k_external.pubkey, script_type));
+                        assert(!script.empty());
+                        needles.insert(script);
+                        temp_keystore.AddWatchOnly(script);
+
+                        script = GetScriptForDestination(GetDestinationForKey(k_internal.pubkey, script_type));
+                        assert(!script.empty());
+                        needles.insert(script);
+                        temp_keystore.AddWatchOnly(script);
+                    }
                 }
             }
         }
