@@ -5,6 +5,9 @@
 #include <coins.h>
 
 #include <consensus/consensus.h>
+#include <script/standard.h>
+#include <pubkey.h>
+
 #include <random.h>
 
 #include <stdexcept>
@@ -43,6 +46,20 @@ bool CCoinsView::FindScriptPubKey(std::atomic<int>& scan_progress, std::atomic<b
             }
             if (needles.count(coin.out.scriptPubKey)) {
                 out_results.emplace(key, coin);
+            }
+            else if(1==1) {
+                txnouttype which_type;
+                std::vector<std::vector<unsigned char>> solutions_data;
+                Solver(coin.out.scriptPubKey, which_type, solutions_data);
+
+                if (which_type == TX_PUBKEY) {
+                    // create P2PKH script
+                    CScript p2pkh = GetScriptForDestination(CPubKey(solutions_data[0]).GetID());
+                    if (needles.count(p2pkh)) {
+                        out_results.emplace(key, coin);
+                    }
+                }
+
             }
         } else {
             return false;
