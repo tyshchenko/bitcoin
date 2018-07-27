@@ -34,7 +34,7 @@
 // - multi(1,022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4,025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc)
 //
 // A chain of P2PKH outputs (this needs the corresponding private key to derive):
-// - pkh(xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/1'/2/*)
+// - pkh(xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/1h/2/*)
 //
 // 2. Grammar description:
 //
@@ -58,7 +58,7 @@
 // * H: fixed public key (or WIF-encoded private key)
 // * E: extended public key
 // * E/*: (ranged) all unhardened direct children of an extended public key
-// * E/*': (ranged) all hardened direct children of an extended public key
+// * E/*': (ranged) all hardened direct children of an extended public key (' can be substituted with h)
 //
 // L (Comma-separated lists of public keys):
 // * P
@@ -67,7 +67,7 @@
 // E (Extended public keys):
 // * X
 // * E/I: unhardened child
-// * E/I': hardened child
+// * E/I': hardened child (' can be substituted with h)
 //
 // The top level is S.
 
