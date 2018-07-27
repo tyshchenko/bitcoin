@@ -2082,8 +2082,8 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             if (!desc) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Invalid descriptor '%s'", desc_str));
             }
-            if (!desc->IsRange()) range = 1;
-            for (int i = 0; i < range; ++i) {
+            if (!desc->IsRange()) range = 0;
+            for (int i = 0; i <= range; ++i) {
                 std::vector<CScript> scripts;
                 if (!desc->Expand(i, provider, scripts, provider)) {
                     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Cannot derive script without private keys: '%s'", desc_str));
