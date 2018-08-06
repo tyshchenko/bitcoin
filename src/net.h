@@ -613,6 +613,7 @@ public:
     int readData(const char *pch, unsigned int nBytes);
 };
 
+typedef std::unique_ptr<CNetMessage> CNetMessageRef;
 
 /** Information about a peer */
 class CNode
@@ -631,7 +632,7 @@ public:
     CCriticalSection cs_vRecv;
 
     CCriticalSection cs_vProcessMsg;
-    std::list<CNetMessage> vProcessMsg;
+    std::list<CNetMessageRef> vProcessMsg;
     size_t nProcessQueueSize;
 
     CCriticalSection cs_sendProcessing;
@@ -750,7 +751,7 @@ private:
     const ServiceFlags nLocalServices;
     const int nMyStartingHeight;
     int nSendVersion;
-    std::list<CNetMessage> vRecvMsg;  // Used only by SocketHandler thread
+    std::list<CNetMessageRef> vRecvMsg; // Used only by SocketHandler thread
 
     mutable CCriticalSection cs_addrName;
     std::string addrName;
