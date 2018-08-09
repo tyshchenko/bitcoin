@@ -138,6 +138,7 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  net_message.h \
   net_processing.h \
   netaddress.h \
   netbase.h \
@@ -239,6 +240,7 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
+  net_message.cpp \
   net_processing.cpp \
   noui.cpp \
   outputtype.cpp \
