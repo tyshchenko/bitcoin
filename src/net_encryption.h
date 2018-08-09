@@ -7,9 +7,11 @@
 
 #include <memory>
 
+#include <crypto/chachapoly_aead.h>
 #include <key.h>
 #include <net_message.h>
 #include <streams.h>
+#include <sync.h>
 #include <uint256.h>
 
 
@@ -33,7 +35,18 @@ private:
     static constexpr unsigned int TAG_LEN = 16; /* poly1305 128bit MAC tag */
     static constexpr unsigned int AAD_LEN = 3;  /* 24 bit payload length */
 
+    CCriticalSection cs;
+    struct chachapolyaead_ctx m_aead_ctx;
+    uint32_t m_recv_seq_nr = 0;
+    uint32_t m_send_seq_nr = 0;
+
 public:
+    BIP151Encryption();
+    ~BIP151Encryption()
+    {
+        memory_cleanse(&m_aead_ctx, sizeof(m_aead_ctx));
+    }
+
     bool GetLength(CDataStream& data_in, uint32_t& len_out) override;
     bool EncryptAppendMAC(std::vector<unsigned char>& data_in_out) override;
     bool AuthenticatedAndDecrypt(CDataStream& data_in_out) override;
