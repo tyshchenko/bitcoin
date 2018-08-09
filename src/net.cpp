@@ -2700,6 +2700,10 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;
+    m_encryption_handler = nullptr;
+    if (gArgs.GetBoolArg("-netencryption", DEFAULT_ALLOW_NET_ENCRYPTION)) {
+        m_encryption_handler = std::make_shared<BIP151Encryption>();
+    }
     hashContinue = uint256();
     nStartingHeight = -1;
     filterInventoryKnown.reset();
