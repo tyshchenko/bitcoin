@@ -812,11 +812,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
                 NetMessageBaseRef oldmsg = std::move(vRecvMsg.back());
                 vRecvMsg.pop_back();
 
-                if (!m_encryption_handler->AuthenticatedAndDecrypt(oldmsg->vRecv)) {
-                    LogPrint(BCLog::NET, "Authentication or decryption failed peer=%i, disconnecting\n", GetId());
-                    return false;
-                }
-
                 //decompose the envelope and derive the inner message(s)
                 while (oldmsg->vRecv.size()) {
                     NetCryptedMessageRef cmsgref = MakeUnique<NetCryptedMessage>(Params().MessageStart(), SER_NETWORK, INIT_PROTO_VERSION);
