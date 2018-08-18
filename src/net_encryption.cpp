@@ -303,12 +303,16 @@ BIP151Encryption::BIP151Encryption() : handshake_done(false)
 {
     m_k1_encryption_keypack.resize(64);
     m_k2_encryption_keypack.resize(64);
-    m_ecdh_key.MakeNewKey(true);
-    if (m_ecdh_key.GetPubKey()[0] == 3) {
-        // the stealth encryption handshake will only use 32byte pubkeys
-        // force EVEN (0x02) pubkey be negating the private key in case of ODD (0x03) pubkeys
-        m_ecdh_key.Negate();
-    }
+
+    // loop until we have generate a key where its pubkey does not match the network magic
+    do {
+        m_ecdh_key.MakeNewKey(true);
+        if (m_ecdh_key.GetPubKey()[0] == 3) {
+            // the stealth encryption handshake will only use 32byte pubkeys
+            // force EVEN (0x02) pubkey be negating the private key in case of ODD (0x03) pubkeys
+            m_ecdh_key.Negate();
+        }
+    } while (memcmp(&m_ecdh_key.GetPubKey()[1], Params().MessageStart(), 4) == 0);
     assert(m_ecdh_key.IsValid());
 }
 
