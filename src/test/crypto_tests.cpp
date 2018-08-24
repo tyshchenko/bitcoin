@@ -4,15 +4,16 @@
 
 #include <crypto/aes.h>
 #include <crypto/chacha20.h>
+#include <crypto/hkdf_sha256_32.h>
+#include <crypto/hmac_sha256.h>
+#include <crypto/hmac_sha512.h>
 #include <crypto/ripemd160.h>
 #include <crypto/sha1.h>
 #include <crypto/sha256.h>
 #include <crypto/sha512.h>
-#include <crypto/hmac_sha256.h>
-#include <crypto/hmac_sha512.h>
 #include <random.h>
-#include <utilstrencodings.h>
 #include <test/test_bitcoin.h>
+#include <utilstrencodings.h>
 
 #include <vector>
 
@@ -522,6 +523,16 @@ BOOST_AUTO_TEST_CASE(chacha20_testvector)
                  "a97a5f576fe064025d3ce042c566ab2c507b138db853e3d6959660996546cc9c4a6eafdc777c040d70eaf46f76dad3979e5c5"
                  "360c3317166a1c894c94a371876a94df7628fe4eaaf2ccb27d5aaae0ad7ad0f9d4b6ad3b54098746d4524d38407a6deb3ab78"
                  "fab78c9");
+}
+
+BOOST_AUTO_TEST_CASE(hkdf_hmac_sha256_l32_tests)
+{
+    // rfc5869 has no test vectors for HMAC_SHA256 length 32, the one below was created with python HKDF and compared against openssl
+    std::vector<unsigned char> key = ParseHex("7768617420646f2079612077616e7420666f72206e6f7468696e673fab76cfa9");
+    CHKDF_HMAC_SHA256_L32 hkdf32(key.data(), key.size(), "bitcoinecdh");
+    unsigned char out[32];
+    hkdf32.Expand32("BitcoinK1", out);
+    BOOST_CHECK(HexStr(out, out + 32) == "a3924384b5c95acfa0737e7ceacddb0db24ee686e96841a15fcb084c47945bec");
 }
 
 BOOST_AUTO_TEST_CASE(countbits_tests)
