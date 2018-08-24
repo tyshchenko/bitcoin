@@ -295,13 +295,19 @@ crypto_libbitcoin_crypto_base_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 crypto_libbitcoin_crypto_base_a_SOURCES = \
   crypto/aes.cpp \
   crypto/aes.h \
+  crypto/chacha.h \
+  crypto/chacha.c \
   crypto/chacha20.h \
   crypto/chacha20.cpp \
+  crypto/chachapoly_aead.h \
+  crypto/chachapoly_aead.c \
   crypto/common.h \
   crypto/hmac_sha256.cpp \
   crypto/hmac_sha256.h \
   crypto/hmac_sha512.cpp \
   crypto/hmac_sha512.h \
+  crypto/poly1305.h \
+  crypto/poly1305.c \
   crypto/ripemd160.cpp \
   crypto/ripemd160.h \
   crypto/sha1.cpp \
