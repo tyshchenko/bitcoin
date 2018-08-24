@@ -188,4 +188,14 @@ BOOST_AUTO_TEST_CASE(key_signature_tests)
     BOOST_CHECK(found_small);
 }
 
+BOOST_AUTO_TEST_CASE(key_key_negation)
+{
+    CKey key = DecodeSecret(strSecret1C);
+    BOOST_CHECK(key.GetPubKey().data()[0] == 0x03);
+    key.Negate();
+    BOOST_CHECK(key.GetPubKey().data()[0] == 0x02);
+    key.Negate();
+    BOOST_CHECK(key.GetPubKey().data()[0] == 0x03);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
