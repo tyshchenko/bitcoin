@@ -634,6 +634,7 @@ protected:
 
     mapMsgCmdSize mapSendBytesPerMsgCmd;
     mapMsgCmdSize mapRecvBytesPerMsgCmd;
+    void RecordRecvBytesPerMsgCmd(const std::string& cmd, uint32_t bytes);
 
 public:
     uint256 hashContinue;
