@@ -860,6 +860,7 @@ struct CCoinsStats
     uint256 hashSerialized;
     uint64_t nDiskSize;
     CAmount nTotalAmount;
+    std::map<txnouttype, uint64_t> m_script_types;
 
     CCoinsStats() : nHeight(0), nTransactions(0), nTransactionOutputs(0), nBogoSize(0), nDiskSize(0), nTotalAmount(0) {}
 };
@@ -870,6 +871,7 @@ static void ApplyStats(CCoinsStats &stats, CHashWriter& ss, const uint256& hash,
     ss << hash;
     ss << VARINT(outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase ? 1u : 0u);
     stats.nTransactions++;
+    std::vector<std::vector<unsigned char>> unused_solutions;
     for (const auto& output : outputs) {
         ss << VARINT(output.first + 1);
         ss << output.second.out.scriptPubKey;
@@ -878,12 +880,14 @@ static void ApplyStats(CCoinsStats &stats, CHashWriter& ss, const uint256& hash,
         stats.nTotalAmount += output.second.out.nValue;
         stats.nBogoSize += 32 /* txid */ + 4 /* vout index */ + 4 /* height + coinbase */ + 8 /* amount */ +
                            2 /* scriptPubKey len */ + output.second.out.scriptPubKey.size() /* scriptPubKey */;
+        txnouttype typeRet = Solver(output.second.out.scriptPubKey, unused_solutions);
+        stats.m_script_types[typeRet]++;
     }
     ss << VARINT(0u);
 }
 
 //! Calculate statistics about the unspent transaction output set
-static bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats)
+bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats)
 {
     std::unique_ptr<CCoinsViewCursor> pcursor(view->Cursor());
     assert(pcursor);
@@ -1006,6 +1010,11 @@ static UniValue gettxoutsetinfo(const JSONRPCRequest& request)
         ret.pushKV("hash_serialized_2", stats.hashSerialized.GetHex());
         ret.pushKV("disk_size", stats.nDiskSize);
         ret.pushKV("total_amount", ValueFromAmount(stats.nTotalAmount));
+        UniValue script_type(UniValue::VOBJ);
+        for (auto const& type_count_pair : stats.m_script_types) {
+            script_type.pushKV(GetTxnOutputType(type_count_pair.first), type_count_pair.second);
+        }
+        ret.pushKV("total_script_types", script_type);
     } else {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to read UTXO set");
     }

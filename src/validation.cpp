@@ -10,6 +10,7 @@
 #include <chainparams.h>
 #include <checkpoints.h>
 #include <checkqueue.h>
+#include <coins.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/tx_verify.h>
@@ -46,6 +47,21 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/thread.hpp>
+
+struct CCoinsStats
+{
+    int nHeight;
+    uint256 hashBlock;
+    uint64_t nTransactions;
+    uint64_t nTransactionOutputs;
+    uint64_t nBogoSize;
+    uint256 hashSerialized;
+    uint64_t nDiskSize;
+    CAmount nTotalAmount;
+    std::map<txnouttype, uint64_t> m_script_types;
+
+    CCoinsStats() : nHeight(0), nTransactions(0), nTransactionOutputs(0), nBogoSize(0), nDiskSize(0), nTotalAmount(0) {}
+};
 
 #if defined(NDEBUG)
 # error "Bitcoin cannot be compiled without assertions."
@@ -2224,6 +2240,7 @@ static void AppendWarning(std::string& res, const std::string& warn)
     res += warn;
 }
 
+extern bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats);
 /** Check warning conditions and do some notifications on new chain tip set. */
 void static UpdateTip(const CBlockIndex *pindexNew, const CChainParams& chainParams) {
     // New best block
@@ -2267,6 +2284,18 @@ void static UpdateTip(const CBlockIndex *pindexNew, const CChainParams& chainPar
             std::string strWarning = _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect");
             // notify GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             DoWarning(strWarning);
+        }
+    }
+    if (pindexNew->nHeight % 10000 == 0) {
+        CCoinsStats stats;
+        FlushStateToDisk();
+        if (GetUTXOStats(pcoinsdbview.get(), stats)) {
+            std::cout << stats.nHeight << ":" << stats.hashBlock.GetHex() << ":" << stats.nTransactions << ":" << stats.nTransactionOutputs << ":" << stats.nDiskSize << ":" << stats.nTotalAmount;
+            for (auto const& type_count_pair : stats.m_script_types)
+            {
+                 std::cout << GetTxnOutputType(type_count_pair.first) << ":" << type_count_pair.second << ",";
+            }
+            std::cout << "\n";
         }
     }
     LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)", __func__, /* Continued */
