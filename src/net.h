@@ -612,7 +612,7 @@ public:
 
     int64_t nTime;                  // time (in microseconds) of message receipt.
 
-    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn) {
+    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn) : hdrbuf(SER_NETWORK, INIT_PROTO_VERSION), hdr(pchMessageStartIn), vRecv(SER_NETWORK, INIT_PROTO_VERSION) {
         hdrbuf.resize(24);
         in_data = false;
         nHdrPos = 0;
