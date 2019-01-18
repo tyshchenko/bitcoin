@@ -602,26 +602,27 @@ private:
     mutable uint256 data_hash;
 public:
     bool in_data;                   // parsing header (false) or data (true)
-
-    CMessageHeader hdr;             // complete header
-
     CDataStream vRecv;              // received message data
     unsigned int nDataPos;
-
     int64_t nTime;                  // time (in microseconds) of message receipt.
 
-    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn) : hdr(pchMessageStartIn), vRecv(SER_NETWORK, INIT_PROTO_VERSION) {
+    uint32_t m_msg_size;
+    std::string m_cmd;
+    uint256 m_checksum;
+
+    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn) : vRecv(SER_NETWORK, INIT_PROTO_VERSION) {
         vRecv.resize(24);
         in_data = false;
         nDataPos = 0;
         nTime = 0;
+        m_msg_size = std::numeric_limits<uint32_t>::max();
     }
 
     bool complete() const
     {
         if (!in_data)
             return false;
-        return (hdr.nMessageSize == nDataPos);
+        return (m_msg_size == nDataPos);
     }
 
     const uint256& GetMessageHash() const;

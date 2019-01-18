@@ -762,7 +762,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
         if (handled < 0)
             return false;
 
-        if (msg.in_data && msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH) {
+        if (msg.in_data && msg.m_msg_size > MAX_PROTOCOL_MESSAGE_LENGTH) {
             LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", GetId());
             return false;
         }
@@ -773,11 +773,11 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
         if (msg.complete()) {
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
-            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.hdr.pchCommand);
+            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.m_cmd);
             if (i == mapRecvBytesPerMsgCmd.end())
                 i = mapRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
             assert(i != mapRecvBytesPerMsgCmd.end());
-            i->second += msg.hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
+            i->second += msg.m_msg_size + CMessageHeader::HEADER_SIZE;
 
             msg.nTime = nTimeMicros;
             complete = true;
@@ -827,6 +827,7 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
     if (nDataPos < 24)
         return nCopy;
 
+    CMessageHeader hdr(Params().MessageStart());
     // deserialize to CMessageHeader
     try {
         vRecv >> hdr;
@@ -840,6 +841,10 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
         return -1;
     }
 
+    m_msg_size = hdr.nMessageSize;
+    m_cmd = hdr.pchCommand;
+    memcpy(m_checksum.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE);
+
     // switch state to reading message data
     in_data = true;
     nDataPos = 0;
@@ -850,17 +855,29 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 
 int CNetMessage::readData(const char *pch, unsigned int nBytes)
 {
-    unsigned int nRemaining = hdr.nMessageSize - nDataPos;
+    unsigned int nRemaining = m_msg_size - nDataPos;
     unsigned int nCopy = std::min(nRemaining, nBytes);
 
     if (vRecv.size() < nDataPos + nCopy) {
         // Allocate up to 256 KiB ahead, but never more than the total message size.
-        vRecv.resize(std::min(hdr.nMessageSize, nDataPos + nCopy + 256 * 1024));
+        vRecv.resize(std::min(m_msg_size, nDataPos + nCopy + 256 * 1024));
     }
 
     hasher.Write((const unsigned char*)pch, nCopy);
     memcpy(&vRecv[nDataPos], pch, nCopy);
     nDataPos += nCopy;
+
+    if (complete()) {
+        const uint256& hash = GetMessageHash();
+        if (!std::equal(m_checksum.begin(), m_checksum.end(), hash.begin()))
+        {
+            LogPrint(BCLog::NET, "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+               SanitizeString(m_cmd), m_msg_size,
+               HexStr(hash.begin(), hash.begin()+m_checksum.size()),
+               HexStr(m_checksum.begin(), m_checksum.end()));
+            return -1;
+        }
+    }
 
     return nCopy;
 }

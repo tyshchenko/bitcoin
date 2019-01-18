@@ -3017,23 +3017,11 @@ bool PeerLogicValidation::ProcessMessages(CNode* pfrom, std::atomic<bool>& inter
     msg.SetVersion(pfrom->GetRecvVersion());
 
     // Read header
-    CMessageHeader& hdr = msg.hdr;
-    std::string strCommand = hdr.GetCommand();
+    std::string strCommand = msg.m_cmd;
 
     // Message size
-    unsigned int nMessageSize = hdr.nMessageSize;
-
-    // Checksum
+    unsigned int nMessageSize = msg.m_msg_size;
     CDataStream& vRecv = msg.vRecv;
-    const uint256& hash = msg.GetMessageHash();
-    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0)
-    {
-        LogPrint(BCLog::NET, "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
-           SanitizeString(strCommand), nMessageSize,
-           HexStr(hash.begin(), hash.begin()+CMessageHeader::CHECKSUM_SIZE),
-           HexStr(hdr.pchChecksum, hdr.pchChecksum+CMessageHeader::CHECKSUM_SIZE));
-        return fMoreWork;
-    }
 
     // Process message
     bool fRet = false;
