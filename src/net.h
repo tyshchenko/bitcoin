@@ -603,19 +603,16 @@ private:
 public:
     bool in_data;                   // parsing header (false) or data (true)
 
-    CDataStream hdrbuf;             // partially received header
     CMessageHeader hdr;             // complete header
-    unsigned int nHdrPos;
 
     CDataStream vRecv;              // received message data
     unsigned int nDataPos;
 
     int64_t nTime;                  // time (in microseconds) of message receipt.
 
-    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn) : hdrbuf(SER_NETWORK, INIT_PROTO_VERSION), hdr(pchMessageStartIn), vRecv(SER_NETWORK, INIT_PROTO_VERSION) {
-        hdrbuf.resize(24);
+    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn) : hdr(pchMessageStartIn), vRecv(SER_NETWORK, INIT_PROTO_VERSION) {
+        vRecv.resize(24);
         in_data = false;
-        nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
     }
@@ -631,7 +628,6 @@ public:
 
     void SetVersion(int nVersionIn)
     {
-        hdrbuf.SetVersion(nVersionIn);
         vRecv.SetVersion(nVersionIn);
     }
 

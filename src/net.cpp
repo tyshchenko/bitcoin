@@ -817,19 +817,19 @@ int CNode::GetSendVersion() const
 int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 {
     // copy data to temporary parsing buffer
-    unsigned int nRemaining = 24 - nHdrPos;
+    unsigned int nRemaining = 24 - nDataPos;
     unsigned int nCopy = std::min(nRemaining, nBytes);
 
-    memcpy(&hdrbuf[nHdrPos], pch, nCopy);
-    nHdrPos += nCopy;
+    memcpy(&vRecv[nDataPos], pch, nCopy);
+    nDataPos += nCopy;
 
     // if header incomplete, exit
-    if (nHdrPos < 24)
+    if (nDataPos < 24)
         return nCopy;
 
     // deserialize to CMessageHeader
     try {
-        hdrbuf >> hdr;
+        vRecv >> hdr;
     }
     catch (const std::exception&) {
         return -1;
@@ -842,6 +842,8 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 
     // switch state to reading message data
     in_data = true;
+    nDataPos = 0;
+    vRecv.clear();
 
     return nCopy;
 }
