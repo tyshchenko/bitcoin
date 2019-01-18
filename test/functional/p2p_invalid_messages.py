@@ -144,7 +144,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
     def test_magic_bytes(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
         conn.magic_bytes = b'\x00\x11\x22\x32'
-        with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: INVALID MESSAGESTART ping']):
+        with self.nodes[0].assert_debug_log(['INVALID MESSAGESTART ping']):
             conn.send_message(messages.msg_ping(nonce=0xff))
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
